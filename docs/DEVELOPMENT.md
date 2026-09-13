@@ -15,7 +15,10 @@ see `requirements-dev.txt`), the test tooling, the `config/` directory and the s
 pre-commit hooks.
 
 Requirements on the host: Python 3.14, [`uv`](https://docs.astral.sh/uv/), `git`, `gh`
-(for releases). No Docker, no sudo.
+(for releases), and a C++ compiler with the Python headers (Fedora:
+`sudo dnf install gcc-c++ python3-devel`, Debian/Ubuntu: `sudo apt install g++ python3-dev`).
+No Docker. `scripts/setup` and `scripts/develop` check for the compiler and headers via
+`scripts/check-build-tools` and stop with this hint if they are missing.
 
 ## The dev Home Assistant instance
 
@@ -31,15 +34,17 @@ Requirements on the host: Python 3.14, [`uv`](https://docs.astral.sh/uv/), `git`
 The first start takes a minute because HA installs the Python packages of the configured
 core components into `.venv`. Later starts take a few seconds.
 
-**Expected errors in the log.** HA always loads its base platforms (camera, the voice
-pipeline, ...) even when they are not configured. On a host without a C compiler and
-`libturbojpeg` you will see these at every start; they are harmless for this integration:
+**The voice pipeline packages need the compiler.** On first start HA installs
+`pymicro-vad` and `pyspeex-noise`. They have no wheels for Python 3.14 and are built from
+source. If that fails (`Unable to install package pymicro-vad` in the log), the frontend
+hangs on the loading screen after login: its `get_services` call loads the service
+descriptions of all integrations, which imports the voice pipeline even though it is not
+configured. Install the build tools above and restart HA.
 
-- `Unable to install package pymicro-vad` / `pyspeex-noise` (voice pipeline, needs gcc)
-- `Error loading libturbojpeg` (camera snapshots)
+**Expected errors in the log.** These are harmless for this integration:
+
+- `Error loading libturbojpeg` (camera snapshots; `sudo dnf install turbojpeg` silences it)
 - `Missing required permissions for Bluetooth management` (only with `default_config`)
-
-To silence them: `sudo dnf install gcc python3-devel turbojpeg` and restart. Not required.
 
 **Onboarding.** On a fresh instance either open the URL in the browser and go through the
 onboarding wizard, or run `scripts/onboard-dev` while HA is running to create the `dev` user

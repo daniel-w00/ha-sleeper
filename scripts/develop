@@ -10,6 +10,8 @@ if [[ ! -x .venv/bin/hass ]]; then
     exit 1
 fi
 
+scripts/check-build-tools
+
 mkdir -p config/custom_components
 ln -sfn ../../custom_components/sleeper config/custom_components/sleeper
 

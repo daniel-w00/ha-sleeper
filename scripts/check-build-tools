@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Check that the host can build the C/C++ packages Home Assistant installs on first start
+# (pymicro-vad, pyspeex-noise for the voice pipeline, no wheels for Python 3.14).
+# Without them the frontend hangs on the loading screen after login.
+# Called by scripts/setup and scripts/develop.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+# Already built into the venv: nothing to compile any more.
+if .venv/bin/python -c "import pymicro_vad, pyspeex_noise" 2>/dev/null; then
+    exit 0
+fi
+
+missing=()
+if ! command -v g++ >/dev/null 2>&1; then
+    missing+=("C++ compiler (g++)")
+fi
+include=$(.venv/bin/python -c 'import sysconfig; print(sysconfig.get_path("include"))')
+if [[ ! -f "$include/Python.h" ]]; then
+    missing+=("Python headers ($include/Python.h)")
+fi
+
+if (( ${#missing[@]} )); then
+    echo "Missing build tools, Home Assistant's frontend will not load without them:" >&2
+    printf '  - %s\n' "${missing[@]}" >&2
+    echo "Fedora:        sudo dnf install gcc-c++ python3-devel" >&2
+    echo "Debian/Ubuntu: sudo apt install g++ python3-dev" >&2
+    exit 1
+fi
