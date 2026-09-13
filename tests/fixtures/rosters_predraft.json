@@ -1,0 +1,134 @@
+[
+  {
+    "co_owners": null,
+    "keepers": [],
+    "league_id": "1397743357073084416",
+    "metadata": null,
+    "owner_id": "123456789",
+    "players": [],
+    "reserve": [],
+    "roster_id": 1,
+    "settings": {
+      "fpts": 0,
+      "fpts_decimal": 0,
+      "losses": 0,
+      "ties": 0,
+      "total_moves": 0,
+      "waiver_budget_used": 0,
+      "waiver_position": 4,
+      "wins": 0
+    },
+    "starters": [
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "taxi": []
+  },
+  {
+    "co_owners": null,
+    "keepers": [],
+    "league_id": "1397743357073084416",
+    "metadata": null,
+    "owner_id": null,
+    "players": [],
+    "reserve": [],
+    "roster_id": 2,
+    "settings": {
+      "fpts": 0,
+      "fpts_decimal": 0,
+      "losses": 0,
+      "ties": 0,
+      "total_moves": 0,
+      "waiver_budget_used": 0,
+      "waiver_position": 3,
+      "wins": 0
+    },
+    "starters": [
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "taxi": []
+  },
+  {
+    "co_owners": null,
+    "keepers": [],
+    "league_id": "1397743357073084416",
+    "metadata": null,
+    "owner_id": null,
+    "players": [],
+    "reserve": [],
+    "roster_id": 3,
+    "settings": {
+      "fpts": 0,
+      "fpts_decimal": 0,
+      "losses": 0,
+      "ties": 0,
+      "total_moves": 0,
+      "waiver_budget_used": 0,
+      "waiver_position": 2,
+      "wins": 0
+    },
+    "starters": [
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "taxi": []
+  },
+  {
+    "co_owners": null,
+    "keepers": [],
+    "league_id": "1397743357073084416",
+    "metadata": null,
+    "owner_id": null,
+    "players": [],
+    "reserve": [],
+    "roster_id": 4,
+    "settings": {
+      "fpts": 0,
+      "fpts_decimal": 0,
+      "losses": 0,
+      "ties": 0,
+      "total_moves": 0,
+      "waiver_budget_used": 0,
+      "waiver_position": 1,
+      "wins": 0
+    },
+    "starters": [
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0"
+    ],
+    "taxi": []
+  }
+]

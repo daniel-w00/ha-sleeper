@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+import json
+from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.const import CONF_USERNAME
@@ -15,6 +18,13 @@ from custom_components.sleeper.const import DOMAIN
 
 TEST_USERNAME = "testuser"
 TEST_USER_ID = "123456789"
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def load_json_fixture(name: str) -> Any:
+    """Load a JSON fixture captured from the Sleeper API."""
+    return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
 @pytest.fixture(autouse=True)
@@ -36,13 +46,7 @@ def mock_user() -> SleeperUser:
 @pytest.fixture
 def mock_sport_state() -> SleeperSportState:
     """Return a sport state as the API would deliver it."""
-    return SleeperSportState(
-        week=3,
-        season="2026",
-        season_type="regular",
-        display_week=3,
-        league_season="2026",
-    )
+    return SleeperSportState.from_json(load_json_fixture("state.json"))
 
 
 @pytest.fixture

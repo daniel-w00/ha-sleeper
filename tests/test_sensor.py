@@ -15,7 +15,7 @@ async def test_sensors(
     """Test the sensors are created with the expected values."""
     week = hass.states.get("sensor.test_user_current_week")
     assert week is not None
-    assert week.state == "3"
+    assert week.state == "1"
 
     season = hass.states.get("sensor.test_user_season")
     assert season is not None
