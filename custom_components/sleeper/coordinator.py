@@ -8,7 +8,8 @@ import logging
 from typing import TYPE_CHECKING, override
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -226,6 +227,33 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         _LOGGER.debug(
             "Loaded %d leagues for season %s", len(leagues), state.league_season
         )
+        self._async_remove_stale_league_devices()
+
+    @callback
+    def _async_remove_stale_league_devices(self) -> None:
+        """Remove the devices of leagues the account is no longer part of.
+
+        Removing a device also removes its entities. An empty league list is
+        left alone: it is far more likely a hiccup than the account leaving
+        every league at once, and the devices vanish on the next reload.
+        """
+        if not self._leagues:
+            return
+        keep = {self.user_id, *(league.league_id for league in self._leagues)}
+        device_registry = dr.async_get(self.hass)
+        for device in dr.async_entries_for_config_entry(
+            device_registry, self.config_entry.entry_id
+        ):
+            identifiers = {
+                identifier
+                for domain, identifier in device.identifiers
+                if domain == DOMAIN
+            }
+            if identifiers and not identifiers & keep:
+                _LOGGER.debug("Removing device of stale league %s", device.name)
+                device_registry.async_update_device(
+                    device.id, remove_config_entry_id=self.config_entry.entry_id
+                )
 
     async def _async_fetch_league(
         self, league: SleeperLeague, state: SleeperSportState

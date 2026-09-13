@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from datetime import timedelta
 import json
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import CONF_USERNAME
 from homeassistant.core import HomeAssistant
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
+from pytest_homeassistant_custom_component.syrupy import (
+    HomeAssistantSnapshotExtension,
+)
+from syrupy.assertion import SnapshotAssertion
 
 from custom_components.sleeper.api import (
     SleeperLeague,
@@ -38,6 +47,15 @@ def load_json_fixture(name: str) -> Any:
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
 
 
+async def async_poll(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, delta: timedelta
+) -> None:
+    """Advance time and let the coordinator poll."""
+    freezer.tick(delta)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+
 def rosters_for(league_id: str) -> tuple[SleeperRoster, ...]:
     """Return the fixture rosters of a league, as the client would."""
     name = "rosters.json" if league_id == LEAGUE_ID else "rosters_predraft.json"
@@ -56,6 +74,26 @@ def matchups_for(league_id: str, week: int) -> tuple[SleeperMatchup, ...]:
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
     """Enable loading of custom integrations in every test."""
+
+
+@pytest.fixture
+def snapshot(snapshot: SnapshotAssertion) -> SnapshotAssertion:
+    """Return the snapshot assertion with the Home Assistant extension.
+
+    The plugin ships this override too, but syrupy's own fixture can win the
+    plugin ordering; defining it here makes the extension apply reliably.
+    """
+    return snapshot.use_extension(HomeAssistantSnapshotExtension)
+
+
+@pytest.fixture
+def entity_registry_enabled_by_default() -> Generator[None]:
+    """Enable entities that are disabled by default (same as in core's tests)."""
+    with patch(
+        "homeassistant.helpers.entity.Entity.entity_registry_enabled_default",
+        PropertyMock(return_value=True),
+    ):
+        yield
 
 
 @pytest.fixture

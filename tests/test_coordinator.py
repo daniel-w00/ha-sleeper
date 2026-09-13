@@ -3,15 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import timedelta
 from unittest.mock import MagicMock
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-    async_fire_time_changed,
-)
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.sleeper.api import (
     SleeperConnectionError,
@@ -33,16 +29,13 @@ from custom_components.sleeper.coordinator import (
     SleeperLeagueData,
 )
 
-from .conftest import LEAGUE_ID, PREDRAFT_LEAGUE_ID, TEST_USER_ID, matchups_for
-
-
-async def _poll(
-    hass: HomeAssistant, freezer: FrozenDateTimeFactory, delta: timedelta
-) -> None:
-    """Advance time and let the coordinator poll."""
-    freezer.tick(delta)
-    async_fire_time_changed(hass)
-    await hass.async_block_till_done()
+from .conftest import (
+    LEAGUE_ID,
+    PREDRAFT_LEAGUE_ID,
+    TEST_USER_ID,
+    async_poll,
+    matchups_for,
+)
 
 
 def _matchups_with_points(points: float) -> tuple[SleeperMatchup, ...]:
@@ -218,32 +211,32 @@ async def test_adaptive_interval(
     assert coordinator.update_interval == IDLE_SEASON_UPDATE_INTERVAL
 
     # Nothing changed: stay idle.
-    await _poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
     assert coordinator.update_interval == IDLE_SEASON_UPDATE_INTERVAL
 
     # Points changed: switch to live.
     mock_client.get_matchups.side_effect = lambda league_id, week: (
         _matchups_with_points(80.0) if league_id == LEAGUE_ID else ()
     )
-    await _poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
     assert coordinator.update_interval == LIVE_UPDATE_INTERVAL
     my_matchup = coordinator.data.leagues[LEAGUE_ID].my_matchup
     assert my_matchup is not None
     assert my_matchup.points == 80.0
 
     # Unchanged but within the grace period: stay live.
-    await _poll(hass, freezer, LIVE_UPDATE_INTERVAL)
+    await async_poll(hass, freezer, LIVE_UPDATE_INTERVAL)
     assert coordinator.update_interval == LIVE_UPDATE_INTERVAL
 
     # Another change resets the grace period.
     mock_client.get_matchups.side_effect = lambda league_id, week: (
         _matchups_with_points(85.0) if league_id == LEAGUE_ID else ()
     )
-    await _poll(hass, freezer, LIVE_UPDATE_INTERVAL)
+    await async_poll(hass, freezer, LIVE_UPDATE_INTERVAL)
     assert coordinator.update_interval == LIVE_UPDATE_INTERVAL
 
     # Grace period over without changes: back to idle.
-    await _poll(hass, freezer, LIVE_GRACE_PERIOD)
+    await async_poll(hass, freezer, LIVE_GRACE_PERIOD)
     assert coordinator.update_interval == IDLE_SEASON_UPDATE_INTERVAL
 
 
@@ -280,12 +273,12 @@ async def test_league_refresh(
     assert mock_client.get_user_leagues.await_count == 1
     assert mock_client.get_league_users.await_count == 2
 
-    await _poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
     assert mock_client.get_user_leagues.await_count == 1
 
     # A league disappears; the hourly refresh picks it up.
     mock_client.get_user_leagues.return_value = mock_leagues[1:]
-    await _poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
+    await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
     assert mock_client.get_user_leagues.await_count == 2
     assert set(coordinator.data.leagues) == {LEAGUE_ID}
 
@@ -294,7 +287,7 @@ async def test_league_refresh(
         sport_state, league_season="2027"
     )
     mock_client.get_user_leagues.return_value = mock_leagues
-    await _poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
     assert mock_client.get_user_leagues.await_count == 3
     mock_client.get_user_leagues.assert_awaited_with(TEST_USER_ID, "2027")
     assert set(coordinator.data.leagues) == {LEAGUE_ID, PREDRAFT_LEAGUE_ID}
@@ -310,7 +303,7 @@ async def test_update_failed_and_recovery(
     coordinator: SleeperCoordinator = init_integration.runtime_data
 
     mock_client.get_rosters.side_effect = SleeperConnectionError("down")
-    await _poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
     assert coordinator.last_update_success is False
     week = hass.states.get("sensor.test_user_current_week")
     assert week is not None
@@ -318,7 +311,7 @@ async def test_update_failed_and_recovery(
 
     mock_client.get_rosters.side_effect = None
     mock_client.get_rosters.return_value = ()
-    await _poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
     assert coordinator.last_update_success is True
     week = hass.states.get("sensor.test_user_current_week")
     assert week is not None

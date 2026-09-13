@@ -22,12 +22,140 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "matchup_leading": {
+        "name": "Leading matchup",
+        "state_attributes": {
+          "margin": {
+            "name": "Margin"
+          }
+        }
+      }
+    },
     "sensor": {
       "current_week": {
         "name": "Current week"
       },
       "season": {
         "name": "Season"
+      },
+      "season_type": {
+        "name": "Season type",
+        "state": {
+          "pre": "Preseason",
+          "regular": "Regular season",
+          "post": "Postseason",
+          "off": "Off-season"
+        }
+      },
+      "league_status": {
+        "name": "League status",
+        "state": {
+          "pre_draft": "Pre-draft",
+          "drafting": "Drafting",
+          "in_season": "In season",
+          "complete": "Complete"
+        },
+        "state_attributes": {
+          "season": {
+            "name": "Season"
+          },
+          "num_teams": {
+            "name": "Teams"
+          },
+          "playoff_week_start": {
+            "name": "Playoffs start week"
+          },
+          "playoff_teams": {
+            "name": "Playoff teams"
+          },
+          "scoring_type": {
+            "name": "Scoring",
+            "state": {
+              "ppr": "PPR",
+              "half_ppr": "Half PPR",
+              "standard": "Standard",
+              "custom": "Custom"
+            }
+          }
+        }
+      },
+      "record": {
+        "name": "Record",
+        "state_attributes": {
+          "wins": {
+            "name": "Wins"
+          },
+          "losses": {
+            "name": "Losses"
+          },
+          "ties": {
+            "name": "Ties"
+          }
+        }
+      },
+      "wins": {
+        "name": "Wins"
+      },
+      "losses": {
+        "name": "Losses"
+      },
+      "ties": {
+        "name": "Ties"
+      },
+      "rank": {
+        "name": "Rank"
+      },
+      "points_for": {
+        "name": "Points for"
+      },
+      "points_against": {
+        "name": "Points against"
+      },
+      "matchup_points": {
+        "name": "Matchup points",
+        "state_attributes": {
+          "week": {
+            "name": "Week"
+          },
+          "matchup_id": {
+            "name": "Matchup ID"
+          },
+          "starters": {
+            "name": "Starters"
+          },
+          "starters_points": {
+            "name": "Starter points"
+          }
+        }
+      },
+      "opponent_points": {
+        "name": "Opponent points"
+      },
+      "opponent": {
+        "name": "Opponent",
+        "state_attributes": {
+          "opponent_roster_id": {
+            "name": "Opponent roster ID"
+          },
+          "opponent_record": {
+            "name": "Opponent record"
+          }
+        }
+      },
+      "waiver_position": {
+        "name": "Waiver position"
+      },
+      "waiver_budget_remaining": {
+        "name": "Waiver budget remaining",
+        "state_attributes": {
+          "budget": {
+            "name": "Budget"
+          },
+          "used": {
+            "name": "Used"
+          }
+        }
       }
     }
   }

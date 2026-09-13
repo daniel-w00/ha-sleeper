@@ -1,11 +1,61 @@
 {
   "entity": {
+    "binary_sensor": {
+      "matchup_leading": {
+        "default": "mdi:arrow-up-bold-circle",
+        "state": {
+          "off": "mdi:arrow-down-bold-circle"
+        }
+      }
+    },
     "sensor": {
       "current_week": {
         "default": "mdi:calendar-week"
       },
       "season": {
         "default": "mdi:football"
+      },
+      "season_type": {
+        "default": "mdi:calendar-range"
+      },
+      "league_status": {
+        "default": "mdi:trophy-outline"
+      },
+      "record": {
+        "default": "mdi:scoreboard-outline"
+      },
+      "wins": {
+        "default": "mdi:trophy"
+      },
+      "losses": {
+        "default": "mdi:thumb-down-outline"
+      },
+      "ties": {
+        "default": "mdi:equal"
+      },
+      "rank": {
+        "default": "mdi:podium"
+      },
+      "points_for": {
+        "default": "mdi:counter"
+      },
+      "points_against": {
+        "default": "mdi:shield-outline"
+      },
+      "matchup_points": {
+        "default": "mdi:football"
+      },
+      "opponent_points": {
+        "default": "mdi:football-helmet"
+      },
+      "opponent": {
+        "default": "mdi:sword-cross"
+      },
+      "waiver_position": {
+        "default": "mdi:format-list-numbered"
+      },
+      "waiver_budget_remaining": {
+        "default": "mdi:cash"
       }
     }
   }

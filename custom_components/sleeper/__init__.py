@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import DeviceEntryType
 
+from .const import DOMAIN
 from .coordinator import SleeperConfigEntry, SleeperCoordinator
 
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SleeperConfigEntry) -> bool:
@@ -15,6 +20,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: SleeperConfigEntry) -> b
     coordinator = SleeperCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
+
+    # Register the account device up front so the league devices can link to
+    # it through ``via_device_id`` when the platforms create their entities.
+    if TYPE_CHECKING:
+        assert entry.unique_id is not None
+    dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.unique_id)},
+        entry_type=DeviceEntryType.SERVICE,
+        manufacturer="Sleeper",
+        name=entry.title,
+        configuration_url="https://sleeper.com/",
+    )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
