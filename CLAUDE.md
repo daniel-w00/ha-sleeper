@@ -65,9 +65,9 @@ core integration.
 | test-before-setup, runtime-data | `__init__.py` (`async_config_entry_first_refresh`) |
 | common-modules | `coordinator.py`, `entity.py` |
 | entity-unique-id, has-entity-name | `entity.py`, `sensor.py` |
-| appropriate-polling | `const.py` (`DEFAULT_UPDATE_INTERVAL`, to be tuned) |
+| appropriate-polling | `coordinator.py` (adaptive: `LIVE_UPDATE_INTERVAL` / idle intervals in `const.py`) |
 | dependency-transparency | `manifest.json` has no requirements; client is in-package |
-| brands | `custom_components/sleeper/brand/` (todo) |
+| brands | `custom_components/sleeper/brand/` (placeholder icons) |
 | docs-* | `README.md` sections Installation, Configuration, Removal |
 | action-setup, docs-actions, docs-triggers, docs-conditions, entity-event-setup | exempt, see `quality_scale.yaml` |
 

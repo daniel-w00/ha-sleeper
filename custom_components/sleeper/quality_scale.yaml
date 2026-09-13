@@ -6,7 +6,9 @@ rules:
   action-setup:
     status: exempt
     comment: No custom actions yet.
-  appropriate-polling: todo
+  appropriate-polling:
+    status: done
+    comment: Adaptive interval in coordinator.py (60 s while scores change, else 15 min / 1 h); Sleeper's CDN caches responses for 60 s.
   brands:
     status: done
     comment: Placeholder icons shipped in brand/ (served by HA >= 2026.3); replace with final artwork.
@@ -43,7 +45,9 @@ rules:
   config-entry-unloading: done
   docs-configuration-parameters: todo
   docs-installation-parameters: todo
-  entity-unavailable: todo
+  entity-unavailable:
+    status: done
+    comment: Coordinator raises UpdateFailed on API errors; league entities are unavailable once the league is gone.
   integration-owner: done
   log-when-unavailable: todo
   parallel-updates: todo
@@ -61,23 +65,31 @@ rules:
   discovery:
     status: exempt
     comment: Cloud service, nothing to discover.
-  docs-data-update: todo
+  docs-data-update: done
   docs-examples: todo
-  docs-known-limitations: todo
+  docs-known-limitations: done
   docs-supported-devices: todo
-  docs-supported-functions: todo
+  docs-supported-functions: done
   docs-troubleshooting: todo
   docs-use-cases: todo
-  dynamic-devices: todo
+  dynamic-devices:
+    status: done
+    comment: New leagues get devices and entities on the hourly league refresh without a reload.
   entity-category: todo
-  entity-device-class: todo
-  entity-disabled-by-default: todo
+  entity-device-class:
+    status: done
+    comment: Enum device class where it fits; there is no device class for fantasy points.
+  entity-disabled-by-default:
+    status: done
+    comment: The ties sensor is disabled by default.
   entity-translations: done
   exception-translations: todo
   icon-translations: done
   reconfiguration-flow: todo
   repair-issues: todo
-  stale-devices: todo
+  stale-devices:
+    status: done
+    comment: Devices of leagues the account is no longer part of are removed on the league refresh.
 
   # Platinum
   async-dependency: done
