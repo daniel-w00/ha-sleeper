@@ -9,6 +9,7 @@ import logging
 from typing import TYPE_CHECKING, override
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -30,12 +31,14 @@ from .const import (
     DEFAULT_SPORT,
     DOMAIN,
     EMPTY_SLOT_PLAYER_ID,
+    EVENT_PLAYER_SCORED,
     IDLE_OFFSEASON_UPDATE_INTERVAL,
     IDLE_SEASON_UPDATE_INTERVAL,
     LEAGUE_REFRESH_INTERVAL,
     LEAGUE_STATUS_IN_SEASON,
     LIVE_GRACE_PERIOD,
     LIVE_UPDATE_INTERVAL,
+    NOTABLE_POINTS_DELTA,
     PLAYER_STATUS_INACTIVE,
     SCORING_SEASON_TYPES,
     STARTER_OUT_INJURY_STATUSES,
@@ -66,14 +69,13 @@ def _no_player(player_id: str) -> SleeperPlayer | None:
 
 @dataclass(frozen=True, slots=True)
 class SleeperPointsChange:
-    """A player's fantasy points changed between two polls."""
+    """A starter's fantasy points changed notably between two polls."""
 
     roster_id: int
     player_id: str
     player: SleeperPlayer | None
     previous: float
     points: float
-    is_starter: bool
     is_mine: bool
 
     @property
@@ -332,6 +334,8 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             assert self._user is not None
         self._update_interval_for(now, state, leagues)
         leagues = self._detect_points_changes(leagues)
+        for data in leagues.values():
+            self._async_fire_scoring_events(data)
         return SleeperData(user=self._user, state=state, leagues=leagues)
 
     def _leagues_need_refresh(self, now: datetime, state: SleeperSportState) -> bool:
@@ -412,11 +416,14 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
     def _detect_points_changes(
         self, leagues: dict[str, SleeperLeagueData]
     ) -> dict[str, SleeperLeagueData]:
-        """Compare player points of the account's matchups with the last poll.
+        """Compare starter points of the account's matchups with the last poll.
 
-        Only both rosters of the account's own matchup are watched. Keys
-        include the week, so a new week starts from scratch instead of
-        reporting every player dropping to zero.
+        Only the starters of both rosters in the account's own matchup are
+        watched, and only changes of at least ``NOTABLE_POINTS_DELTA`` in one
+        poll count, so the yardage trickle stays quiet and touchdowns, field
+        goals and fumbles come through. Keys include the week, so a new week
+        starts from scratch instead of reporting every player dropping to
+        zero.
         """
         current: dict[tuple[str, int, int, str], float] = {}
         result: dict[str, SleeperLeagueData] = {}
@@ -425,13 +432,17 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             for matchup in (data.my_matchup, data.opponent_matchup):
                 if matchup is None:
                     continue
-                is_mine = matchup is data.my_matchup
-                starters = set(matchup.starters)
-                for player_id, points in matchup.players_points.items():
+                for player_id in matchup.starters:
+                    if player_id == EMPTY_SLOT_PLAYER_ID:
+                        continue
+                    points = matchup.players_points.get(player_id, 0.0)
                     key = (league_id, data.week, matchup.roster_id, player_id)
                     current[key] = points
                     previous = self._last_player_points.get(key)
-                    if previous is None or previous == points:
+                    if (
+                        previous is None
+                        or abs(points - previous) < NOTABLE_POINTS_DELTA
+                    ):
                         continue
                     changes.append(
                         SleeperPointsChange(
@@ -440,8 +451,7 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
                             player=self.players.get(player_id),
                             previous=previous,
                             points=points,
-                            is_starter=player_id in starters,
-                            is_mine=is_mine,
+                            is_mine=matchup is data.my_matchup,
                         )
                     )
             result[league_id] = (
@@ -449,6 +459,43 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             )
         self._last_player_points = current
         return result
+
+    @callback
+    def _async_fire_scoring_events(self, data: SleeperLeagueData) -> None:
+        """Fire one bus event per notable points change of a league.
+
+        The league device's ID is included so the events show up on the
+        device's activity feed; logbook.py renders them.
+        """
+        if not data.points_changes:
+            return
+        device = dr.async_get(self.hass).async_get_device_by_identifier(
+            league_device_identifier(self.user_id, data.league.league_id),
+            config_entry_id=self.config_entry.entry_id,
+        )
+        matchup_id = data.my_matchup.matchup_id if data.my_matchup else None
+        for change in data.points_changes:
+            player = change.player
+            self.hass.bus.async_fire(
+                EVENT_PLAYER_SCORED,
+                {
+                    ATTR_DEVICE_ID: device.id if device else None,
+                    "user_id": self.user_id,
+                    "league_id": data.league.league_id,
+                    "league": data.league.name,
+                    "player_id": change.player_id,
+                    "player": player.name if player else change.player_id,
+                    "position": player.position if player else None,
+                    "team": player.team if player else None,
+                    "roster_id": change.roster_id,
+                    "is_mine": change.is_mine,
+                    "previous_points": change.previous,
+                    "points": change.points,
+                    "delta": change.delta,
+                    "week": data.week,
+                    "matchup_id": matchup_id,
+                },
+            )
 
     def _update_interval_for(
         self,

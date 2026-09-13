@@ -43,4 +43,7 @@ PLAYER_STATUS_INACTIVE: Final = "Inactive"
 # Sleeper fills empty starting slots with this placeholder ID.
 EMPTY_SLOT_PLAYER_ID: Final = "0"
 
-EVENT_POINTS_CHANGED: Final = "points_changed"
+# Bus event fired when a starter in the account's matchup gains or loses at
+# least NOTABLE_POINTS_DELTA points between two polls.
+EVENT_PLAYER_SCORED: Final = "sleeper_player_scored"
+NOTABLE_POINTS_DELTA: Final = 3.0

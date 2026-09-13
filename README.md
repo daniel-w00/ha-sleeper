@@ -82,39 +82,42 @@ These describe the NFL season itself, not the account; they are the same for eve
 | Leading matchup | Binary sensor: on while your points exceed your opponent's. Attribute: margin. |
 | Waiver position | Your position in the waiver order. |
 | Waiver budget remaining | Only in FAAB leagues. Attributes: budget, used. |
-| Player scoring | Event entity. Fires once per player whose points changed since the last poll, for both sides of your matchup, starters and bench. Attributes: player, player ID, position, team, roster ID, own player, starter, previous points, points, change, week, matchup ID. |
 
 Matchup entities are `unknown` on a bye week, before the draft and outside the regular and
 post season.
 
-### Reacting to big plays
+### Big plays: events and the activity feed
 
-The **Player scoring** event fires for every point change of a player in your matchup. To
-celebrate a touchdown-sized play by one of your starters, trigger on the event entity and
-check its attributes:
+Whenever a starter on either side of your matchup gains or loses **3 or more points** between
+two updates (a field goal, a touchdown, a long play, a fumble or a stat correction), the
+integration fires a `sleeper_player_scored` event. The league device's **Activity** feed and
+the logbook show these as readable lines, for example "Caleb Williams scored 6.3 points
+(24 total, Wombats League)".
+
+The event data contains `player`, `player_id`, `position`, `team`, `roster_id`, `is_mine`,
+`previous_points`, `points`, `delta`, `week`, `matchup_id`, `league`, `league_id`,
+`user_id` and `device_id`. To celebrate your own touchdowns:
 
 ```yaml
 triggers:
-  - trigger: state
-    entity_id: event.my_league_player_scoring
+  - trigger: event
+    event_type: sleeper_player_scored
+    event_data:
+      is_mine: true
 conditions:
   - condition: template
-    value_template: >-
-      {{ trigger.to_state.attributes.is_mine
-         and trigger.to_state.attributes.is_starter
-         and trigger.to_state.attributes.delta >= 6 }}
+    value_template: "{{ trigger.event.data.delta >= 6 }}"
 actions:
   - action: notify.mobile_app_phone
     data:
       message: >-
-        {{ trigger.to_state.attributes.player }} just scored
-        {{ trigger.to_state.attributes.delta }} points!
+        {{ trigger.event.data.player }} just scored
+        {{ trigger.event.data.delta }} points!
 ```
 
-Sleeper updates points about once a minute, so two quick plays by the same player can arrive
-as one change, and a change of six or more points is usually, but not always, a touchdown.
-When several players change in the same poll, one event fires per player; the entity ends on
-your own biggest gain.
+Sleeper updates points about once a minute, so two quick plays by the same player can
+arrive as one change, and a change of six or more points is usually, but not always, a
+touchdown. Bench players and changes below 3 points never fire.
 
 ### Season rollover
 

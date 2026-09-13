@@ -8,11 +8,6 @@
         }
       }
     },
-    "event": {
-      "player_scoring": {
-        "default": "mdi:bullhorn"
-      }
-    },
     "sensor": {
       "week": {
         "default": "mdi:calendar-week"

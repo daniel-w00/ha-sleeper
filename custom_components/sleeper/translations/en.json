@@ -32,54 +32,6 @@
         }
       }
     },
-    "event": {
-      "player_scoring": {
-        "name": "Player scoring",
-        "state_attributes": {
-          "event_type": {
-            "state": {
-              "points_changed": "Points changed"
-            }
-          },
-          "player": {
-            "name": "Player"
-          },
-          "player_id": {
-            "name": "Player ID"
-          },
-          "position": {
-            "name": "Position"
-          },
-          "team": {
-            "name": "Team"
-          },
-          "roster_id": {
-            "name": "Roster ID"
-          },
-          "is_mine": {
-            "name": "Own player"
-          },
-          "is_starter": {
-            "name": "Starter"
-          },
-          "previous_points": {
-            "name": "Previous points"
-          },
-          "points": {
-            "name": "Points"
-          },
-          "delta": {
-            "name": "Change"
-          },
-          "week": {
-            "name": "Week"
-          },
-          "matchup_id": {
-            "name": "Matchup ID"
-          }
-        }
-      }
-    },
     "sensor": {
       "week": {
         "name": "{sport} week"
