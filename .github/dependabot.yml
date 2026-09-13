@@ -4,6 +4,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # One PR per week for all action bumps instead of one PR per action.
+    groups:
+      github-actions:
+        patterns: ["*"]
   - package-ecosystem: pip
     directory: /
     schedule:
