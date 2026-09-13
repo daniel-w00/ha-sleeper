@@ -109,6 +109,8 @@ action on any Sleeper entity.
 ## Known limitations
 
 - Only NFL leagues are supported.
+- The NFL week, season and season type sensors are created per account. With several
+  accounts they are duplicates; disable them on the additional accounts if they bother you.
 - The Sleeper API does not publish the NFL schedule, so the first score change of a game
   day is noticed at the idle interval (up to 15 minutes late). After that, updates run every
   60 seconds until scores stop changing.

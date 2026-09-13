@@ -56,6 +56,13 @@ core integration.
 - Do not touch the production HA instance from this repo. Prod testing happens only via a
   HACS install after a backup.
 
+## Open design notes
+
+- The account-level sensors (NFL week, season, season type) describe the sport, not the
+  account. They add little value on their own and are duplicated when several accounts are
+  configured. Kept for now (decided 2026-09-13); candidates for removal, or for moving to a
+  per-sport config entry if phase 2 adds more sport-wide data (trending players etc.).
+
 ## Quality scale (Bronze) — where each rule is satisfied
 
 | Rule | Where |
