@@ -9,7 +9,7 @@
       }
     },
     "sensor": {
-      "current_week": {
+      "week": {
         "default": "mdi:calendar-week"
       },
       "season": {

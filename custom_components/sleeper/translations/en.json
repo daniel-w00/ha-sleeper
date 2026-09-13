@@ -33,14 +33,14 @@
       }
     },
     "sensor": {
-      "current_week": {
-        "name": "Current week"
+      "week": {
+        "name": "{sport} week"
       },
       "season": {
-        "name": "Season"
+        "name": "{sport} season"
       },
       "season_type": {
-        "name": "Season type",
+        "name": "{sport} season type",
         "state": {
           "pre": "Preseason",
           "regular": "Regular season",

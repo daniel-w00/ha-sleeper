@@ -173,7 +173,8 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         )
         if TYPE_CHECKING:
             assert config_entry.unique_id is not None
-        self.client = SleeperClient(async_get_clientsession(hass), sport=DEFAULT_SPORT)
+        self.sport: str = DEFAULT_SPORT
+        self.client = SleeperClient(async_get_clientsession(hass), sport=self.sport)
         self.user_id: str = config_entry.unique_id
         self._user: SleeperUser | None = None
         self._leagues: tuple[SleeperLeague, ...] = ()

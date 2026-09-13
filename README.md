@@ -56,11 +56,13 @@ follow the pattern `sensor.<account>_<name>` and `sensor.<league>_<name>`.
 
 ### Account
 
+These describe the NFL season itself, not the account; they are the same for every league.
+
 | Entity | Description |
 |---|---|
-| Current week | The current NFL week as reported by Sleeper. |
-| Season | The current NFL season. |
-| Season type | `pre`, `regular`, `post` or `off`. |
+| NFL week | The current NFL week as reported by Sleeper. |
+| NFL season | The current NFL season. |
+| NFL season type | `pre`, `regular`, `post` or `off`. |
 
 ### League
 

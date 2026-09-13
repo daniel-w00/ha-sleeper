@@ -26,6 +26,7 @@ class SleeperEntity(CoordinatorEntity[SleeperCoordinator]):
             identifiers={(DOMAIN, coordinator.config_entry.unique_id)},
             entry_type=DeviceEntryType.SERVICE,
             manufacturer="Sleeper",
+            model="Account",
             name=coordinator.config_entry.title,
             configuration_url="https://sleeper.com/",
         )
@@ -51,7 +52,7 @@ class SleeperLeagueEntity(SleeperEntity):
             entry_type=DeviceEntryType.SERVICE,
             manufacturer="Sleeper",
             name=league.name,
-            model=f"{league.num_teams}-team league",
+            model=f"{league.num_teams}-team {league.sport.upper()} league",
             configuration_url=f"https://sleeper.com/leagues/{league_id}",
             # The account device is registered in async_setup_entry before
             # the platforms load, so it can always be resolved here.

@@ -88,8 +88,8 @@ def _waiver_budget_attributes(data: SleeperLeagueData) -> dict[str, Any]:
 
 SENSORS: tuple[SleeperSensorEntityDescription, ...] = (
     SleeperSensorEntityDescription(
-        key="current_week",
-        translation_key="current_week",
+        key="week",
+        translation_key="week",
         value_fn=lambda data: data.state.display_week,
     ),
     SleeperSensorEntityDescription(
@@ -249,7 +249,11 @@ async def async_setup_entry(
 
 
 class SleeperSensor(SleeperEntity, SensorEntity):
-    """An account-level Sleeper sensor."""
+    """An account-level Sleeper sensor.
+
+    These report the state of the sport itself (week, season), so their names
+    carry the sport rather than anything account specific.
+    """
 
     entity_description: SleeperSensorEntityDescription
 
@@ -262,6 +266,7 @@ class SleeperSensor(SleeperEntity, SensorEntity):
         super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{coordinator.config_entry.unique_id}_{description.key}"
+        self._attr_translation_placeholders = {"sport": coordinator.sport.upper()}
 
     @property
     @override

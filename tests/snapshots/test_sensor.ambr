@@ -649,7 +649,7 @@
     'state': '0',
   })
 # ---
-# name: test_sensors[sensor.test_user_current_week-entry]
+# name: test_sensors[sensor.test_user_nfl_season-entry]
   EntityRegistryEntrySnapshot({
     'aliases': list([
       None,
@@ -663,7 +663,7 @@
     'disabled_by': None,
     'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.test_user_current_week',
+    'entity_id': 'sensor.test_user_nfl_season',
     'has_entity_name': True,
     'hidden_by': None,
     'icon': None,
@@ -671,62 +671,12 @@
     'labels': set({
     }),
     'name': None,
-    'object_id_base': 'Current week',
+    'object_id_base': 'NFL season',
     'options': dict({
     }),
     'original_device_class': None,
     'original_icon': None,
-    'original_name': 'Current week',
-    'platform': 'sleeper',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'current_week',
-    'unique_id': '123456789_current_week',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_sensors[sensor.test_user_current_week-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test User Current week',
-    }),
-    'context': <ANY>,
-    'entity_id': 'sensor.test_user_current_week',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': '1',
-  })
-# ---
-# name: test_sensors[sensor.test_user_season-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'sensor',
-    'entity_category': None,
-    'entity_id': 'sensor.test_user_season',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Season',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Season',
+    'original_name': 'NFL season',
     'platform': 'sleeper',
     'previous_unique_id': None,
     'suggested_object_id': None,
@@ -736,20 +686,20 @@
     'unit_of_measurement': None,
   })
 # ---
-# name: test_sensors[sensor.test_user_season-state]
+# name: test_sensors[sensor.test_user_nfl_season-state]
   StateSnapshot({
     'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test User Season',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test User NFL season',
     }),
     'context': <ANY>,
-    'entity_id': 'sensor.test_user_season',
+    'entity_id': 'sensor.test_user_nfl_season',
     'last_changed': <ANY>,
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': '2026',
   })
 # ---
-# name: test_sensors[sensor.test_user_season_type-entry]
+# name: test_sensors[sensor.test_user_nfl_season_type-entry]
   EntityRegistryEntrySnapshot({
     'aliases': list([
       None,
@@ -770,7 +720,7 @@
     'disabled_by': None,
     'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.test_user_season_type',
+    'entity_id': 'sensor.test_user_nfl_season_type',
     'has_entity_name': True,
     'hidden_by': None,
     'icon': None,
@@ -778,12 +728,12 @@
     'labels': set({
     }),
     'name': None,
-    'object_id_base': 'Season type',
+    'object_id_base': 'NFL season type',
     'options': dict({
     }),
     'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
     'original_icon': None,
-    'original_name': 'Season type',
+    'original_name': 'NFL season type',
     'platform': 'sleeper',
     'previous_unique_id': None,
     'suggested_object_id': None,
@@ -793,11 +743,11 @@
     'unit_of_measurement': None,
   })
 # ---
-# name: test_sensors[sensor.test_user_season_type-state]
+# name: test_sensors[sensor.test_user_nfl_season_type-state]
   StateSnapshot({
     'attributes': ReadOnlyDict({
       <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'enum',
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test User Season type',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test User NFL season type',
       <SensorEntityCapabilityAttribute.OPTIONS: 'options'>: list([
         'pre',
         'regular',
@@ -806,11 +756,61 @@
       ]),
     }),
     'context': <ANY>,
-    'entity_id': 'sensor.test_user_season_type',
+    'entity_id': 'sensor.test_user_nfl_season_type',
     'last_changed': <ANY>,
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': 'regular',
+  })
+# ---
+# name: test_sensors[sensor.test_user_nfl_week-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.test_user_nfl_week',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'NFL week',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'NFL week',
+    'platform': 'sleeper',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'week',
+    'unique_id': '123456789_week',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.test_user_nfl_week-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test User NFL week',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.test_user_nfl_week',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '1',
   })
 # ---
 # name: test_sensors[sensor.wombats_league_league_status-entry]

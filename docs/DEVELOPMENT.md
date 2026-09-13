@@ -73,7 +73,7 @@ scripts/onboard-dev   # in another, or use the browser wizard
 ```bash
 TOKEN=$(scripts/api-token)
 curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8123/api/states | python3 -m json.tool | less
-curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8123/api/states/sensor.<account>_current_week
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8123/api/states/sensor.<account>_nfl_week
 ```
 
 For a permanent token create a long-lived access token in the HA profile page

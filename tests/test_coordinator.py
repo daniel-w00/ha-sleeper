@@ -305,7 +305,7 @@ async def test_update_failed_and_recovery(
     mock_client.get_rosters.side_effect = SleeperConnectionError("down")
     await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
     assert coordinator.last_update_success is False
-    week = hass.states.get("sensor.test_user_current_week")
+    week = hass.states.get("sensor.test_user_nfl_week")
     assert week is not None
     assert week.state == "unavailable"
 
@@ -313,7 +313,7 @@ async def test_update_failed_and_recovery(
     mock_client.get_rosters.return_value = ()
     await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
     assert coordinator.last_update_success is True
-    week = hass.states.get("sensor.test_user_current_week")
+    week = hass.states.get("sensor.test_user_nfl_week")
     assert week is not None
     assert week.state == "1"
     assert coordinator.data.leagues[LEAGUE_ID].my_roster is None

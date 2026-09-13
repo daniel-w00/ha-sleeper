@@ -53,6 +53,7 @@ async def test_devices(
     )
     assert account is not None
     assert account.name == "Test User"
+    assert account.model == "Account"
     assert account.entry_type is dr.DeviceEntryType.SERVICE
 
     league = device_registry.async_get_device_by_identifier(
@@ -60,7 +61,7 @@ async def test_devices(
     )
     assert league is not None
     assert league.name == "Wombats League"
-    assert league.model == "12-team league"
+    assert league.model == "12-team NFL league"
     assert league.manufacturer == "Sleeper"
     assert league.via_device_id == account.id
     assert league.configuration_url == f"https://sleeper.com/leagues/{LEAGUE_ID}"
@@ -69,7 +70,7 @@ async def test_devices(
         (DOMAIN, PREDRAFT_LEAGUE_ID), config_entry_id=init_integration.entry_id
     )
     assert predraft is not None
-    assert predraft.model == "4-team league"
+    assert predraft.model == "4-team NFL league"
 
 
 async def test_league_removed_and_rejoined(

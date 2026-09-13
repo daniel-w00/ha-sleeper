@@ -30,6 +30,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SleeperConfigEntry) -> b
         identifiers={(DOMAIN, entry.unique_id)},
         entry_type=DeviceEntryType.SERVICE,
         manufacturer="Sleeper",
+        model="Account",
         name=entry.title,
         configuration_url="https://sleeper.com/",
     )
