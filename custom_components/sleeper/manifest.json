@@ -1,0 +1,13 @@
+{
+  "domain": "sleeper",
+  "name": "Sleeper",
+  "codeowners": ["@daniel-w00"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/daniel-w00/ha-sleeper",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/daniel-w00/ha-sleeper/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Print a short-lived access token for the dev Home Assistant instance,
+# for use with curl:  curl -H "Authorization: Bearer $(scripts/api-token)" http://localhost:8123/api/
+#
+# Uses the dev user created during onboarding (see docs/DEVELOPMENT.md).
+# Override with HA_DEV_USER / HA_DEV_PASSWORD / HA_DEV_URL.
+set -euo pipefail
+
+BASE="${HA_DEV_URL:-http://localhost:8123}"
+USER="${HA_DEV_USER:-dev}"
+PASS="${HA_DEV_PASSWORD:-dev}"
+CLIENT_ID="$BASE/"
+
+flow_id=$(curl -sf -X POST "$BASE/auth/login_flow" \
+    -H 'Content-Type: application/json' \
+    -d "{\"client_id\":\"$CLIENT_ID\",\"handler\":[\"homeassistant\",null],\"redirect_uri\":\"$CLIENT_ID\"}" \
+    | python3 -c 'import sys, json; print(json.load(sys.stdin)["flow_id"])')
+
+code=$(curl -sf -X POST "$BASE/auth/login_flow/$flow_id" \
+    -H 'Content-Type: application/json' \
+    -d "{\"client_id\":\"$CLIENT_ID\",\"username\":\"$USER\",\"password\":\"$PASS\"}" \
+    | python3 -c 'import sys, json; print(json.load(sys.stdin)["result"])')
+
+curl -sf -X POST "$BASE/auth/token" \
+    -d "grant_type=authorization_code&code=$code&client_id=$CLIENT_ID" \
+    | python3 -c 'import sys, json; print(json.load(sys.stdin)["access_token"])'

@@ -1,0 +1,12 @@
+{
+  "entity": {
+    "sensor": {
+      "current_week": {
+        "default": "mdi:calendar-week"
+      },
+      "season": {
+        "default": "mdi:football"
+      }
+    }
+  }
+}

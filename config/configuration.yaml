@@ -1,0 +1,35 @@
+# Development Home Assistant configuration.
+# Started with: scripts/develop  (hass -c config --debug)
+# The integration is loaded via the symlink config/custom_components/sleeper.
+#
+# Deliberately NOT `default_config:` — that bundle pulls in bluetooth, voice,
+# camera, USB/DHCP discovery etc., which need hardware or compilers and only
+# add noise here. This is the lean set a cloud-polling integration needs.
+
+homeassistant:
+  name: Sleeper Dev
+  unit_system: metric
+  time_zone: Europe/Berlin
+  country: DE
+
+frontend:
+config:
+api:
+history:
+logbook:
+recorder:
+sun:
+system_health:
+my:
+person:
+
+logger:
+  default: info
+  logs:
+    custom_components.sleeper: debug
+
+# Attach a debugger without restarting HA (VS Code: "Python: Remote Attach" on 5678).
+# The IDE run configs launch hass under their own debugger instead, so this stays off.
+# debugpy:
+#   start: true
+#   wait: false

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Complete Home Assistant onboarding on the running dev instance via the API,
+# creating the dev user (dev / dev). Run once after scripts/reset-dev.
+# Override with HA_DEV_USER / HA_DEV_PASSWORD / HA_DEV_URL.
+set -euo pipefail
+
+BASE="${HA_DEV_URL:-http://localhost:8123}"
+USER="${HA_DEV_USER:-dev}"
+PASS="${HA_DEV_PASSWORD:-dev}"
+CLIENT_ID="$BASE/"
+
+json() { python3 -c "import sys, json; print(json.load(sys.stdin)[\"$1\"])"; }
+
+until curl -s -o /dev/null "$BASE/"; do
+    echo "Waiting for Home Assistant at $BASE ..."
+    sleep 2
+done
+
+code=$(curl -sf -X POST "$BASE/api/onboarding/users" -H 'Content-Type: application/json' \
+    -d "{\"client_id\":\"$CLIENT_ID\",\"name\":\"Dev\",\"username\":\"$USER\",\"password\":\"$PASS\",\"language\":\"en\"}" \
+    | json auth_code) || { echo "Onboarding already done (or failed)." >&2; exit 1; }
+
+token=$(curl -sf -X POST "$BASE/auth/token" \
+    -d "grant_type=authorization_code&code=$code&client_id=$CLIENT_ID" | json access_token)
+auth="Authorization: Bearer $token"
+
+curl -sf -X POST "$BASE/api/onboarding/core_config" -H "$auth" >/dev/null
+curl -sf -X POST "$BASE/api/onboarding/analytics" -H "$auth" >/dev/null
+curl -sf -X POST "$BASE/api/onboarding/integration" -H "$auth" -H 'Content-Type: application/json' \
+    -d "{\"client_id\":\"$CLIENT_ID\",\"redirect_uri\":\"$CLIENT_ID\"}" >/dev/null
+
+echo "Onboarding complete. Log in at $BASE with user '$USER'."

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Create the development environment: venv with Home Assistant (pinned to prod),
+# test tooling, the dev config directory and the integration symlink.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if ! command -v uv >/dev/null 2>&1; then
+    echo "uv not found. Install it: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
+    exit 1
+fi
+
+uv venv --python 3.14 .venv
+uv pip install -r requirements-dev.txt
+
+mkdir -p config/custom_components
+ln -sfn ../../custom_components/sleeper config/custom_components/sleeper
+
+if [[ -f .pre-commit-config.yaml ]] && [[ -d .git ]]; then
+    .venv/bin/pre-commit install --install-hooks
+fi
+
+echo
+echo "Done. Home Assistant $(.venv/bin/hass --version) is installed in .venv."
+echo "Start it with: scripts/develop"

@@ -1,0 +1,11 @@
+name: Feature request
+description: Suggest a new sensor, action or capability
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: Describe the feature and how you would use it in Home Assistant.
+    validations:
+      required: true

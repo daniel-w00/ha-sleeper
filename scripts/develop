@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Start the development Home Assistant instance on http://localhost:8123
+# with the integration loaded from custom_components/sleeper.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if [[ ! -x .venv/bin/hass ]]; then
+    echo "No venv found, run scripts/setup first." >&2
+    exit 1
+fi
+
+mkdir -p config/custom_components
+ln -sfn ../../custom_components/sleeper config/custom_components/sleeper
+
+# On first start Home Assistant installs the requirements of default_config
+# (frontend etc.) into the venv itself; later starts are fast.
+exec .venv/bin/hass --config "$PWD/config" --debug

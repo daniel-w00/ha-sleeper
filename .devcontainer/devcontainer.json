@@ -1,0 +1,38 @@
+{
+  "name": "ha-sleeper",
+  "image": "mcr.microsoft.com/devcontainers/base:debian",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.14",
+      "installTools": false
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/va-h/devcontainers-features/uv:1": {}
+  },
+  "forwardPorts": [8123],
+  "portsAttributes": {
+    "8123": { "label": "Home Assistant", "onAutoForward": "notify" }
+  },
+  "postCreateCommand": "scripts/setup",
+  "remoteUser": "vscode",
+  "runArgs": ["--userns=keep-id", "--security-opt=label=disable"],
+  "containerEnv": {
+    "PYTHONASYNCIODEBUG": "1",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "charliermarsh.ruff",
+        "redhat.vscode-yaml",
+        "editorconfig.editorconfig",
+        "ryanluker.vscode-coverage-gutters"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python"
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Run the test suite with coverage. Extra arguments are passed to pytest,
+# e.g. scripts/test tests/test_config_flow.py -k user
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+exec .venv/bin/pytest "$@"

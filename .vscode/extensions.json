@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "charliermarsh.ruff",
+    "redhat.vscode-yaml",
+    "editorconfig.editorconfig",
+    "ryanluker.vscode-coverage-gutters",
+    "ms-vscode-remote.remote-containers"
+  ]
+}

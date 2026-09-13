@@ -1,0 +1,124 @@
+[project]
+name = "ha-sleeper"
+version = "0.0.0"
+description = "Home Assistant custom integration for Sleeper fantasy football"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+authors = [{ name = "Daniel Wilhelm" }]
+
+# The integration itself is not a Python package; this file only carries tool configuration.
+# Runtime dependencies are declared in custom_components/sleeper/manifest.json,
+# development dependencies in requirements-dev.txt.
+
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+src = ["custom_components", "tests"]
+
+[tool.ruff.lint]
+# Modeled on Home Assistant core's ruff configuration.
+select = [
+  "A",     # flake8-builtins
+  "ASYNC", # flake8-async
+  "B",     # flake8-bugbear
+  "C4",    # flake8-comprehensions
+  "COM",   # flake8-commas
+  "D",     # pydocstyle
+  "DTZ",   # flake8-datetimez
+  "E",     # pycodestyle errors
+  "ERA",   # eradicate (commented-out code)
+  "F",     # pyflakes
+  "FBT",   # flake8-boolean-trap
+  "FLY",   # flynt
+  "FURB",  # refurb
+  "G",     # flake8-logging-format
+  "I",     # isort
+  "ICN",   # flake8-import-conventions
+  "INP",   # flake8-no-pep420
+  "ISC",   # flake8-implicit-str-concat
+  "LOG",   # flake8-logging
+  "N",     # pep8-naming
+  "PERF",  # perflint
+  "PGH",   # pygrep-hooks
+  "PIE",   # flake8-pie
+  "PL",    # pylint
+  "PT",    # flake8-pytest-style
+  "PTH",   # flake8-use-pathlib
+  "PYI",   # flake8-pyi
+  "RET",   # flake8-return
+  "RSE",   # flake8-raise
+  "RUF",   # ruff-specific
+  "S",     # flake8-bandit
+  "SIM",   # flake8-simplify
+  "SLF",   # flake8-self
+  "SLOT",  # flake8-slots
+  "T20",   # flake8-print
+  "TID",   # flake8-tidy-imports
+  "TRY",   # tryceratops
+  "UP",    # pyupgrade
+  "W",     # pycodestyle warnings
+]
+ignore = [
+  "COM812", # handled by the formatter
+  "D203",   # one-blank-line-before-class (conflicts with D211)
+  "D213",   # multi-line-summary-second-line (conflicts with D212)
+  "E501",   # line length is handled by the formatter
+  "ISC001", # handled by the formatter
+  "PLR0913", # too many arguments
+  "PLR2004", # magic values in comparisons
+  "TRY003", # long exception messages
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+  "S101",    # asserts are fine in tests
+  "SLF001",  # private member access is fine in tests
+  "PLR0913",
+]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+known-first-party = ["custom_components.sleeper"]
+combine-as-imports = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"async_timeout".msg = "use asyncio.timeout instead"
+"pytz".msg = "use zoneinfo instead"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.pyright]
+pythonVersion = "3.14"
+venvPath = "."
+venv = ".venv"
+include = ["custom_components", "tests"]
+typeCheckingMode = "standard"
+reportMissingImports = true
+reportMissingTypeStubs = false
+# Flow results are TypedDicts with optional keys; asserting result["type"] etc.
+# is the established Home Assistant test style.
+reportTypedDictNotRequiredAccess = false
+# Home Assistant's canonical entity patterns (narrowing `entity_description`,
+# overriding `native_value` with a property) are written for mypy and trip this check.
+reportIncompatibleVariableOverride = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+norecursedirs = [".git", ".venv", "config"]
+addopts = "-p no:cacheprovider --cov=custom_components.sleeper --cov-report=term-missing"
+filterwarnings = ["error::sqlalchemy.exc.SAWarning"]
+
+[tool.coverage.run]
+source = ["custom_components/sleeper"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false

@@ -1,0 +1,9 @@
+# Development dependencies. Home Assistant is pinned to the production instance's version.
+# Bump both lines together when prod is upgraded.
+homeassistant==2026.9.2
+pytest-homeassistant-custom-component==0.13.365
+
+# Tooling
+ruff
+pyright
+pre-commit

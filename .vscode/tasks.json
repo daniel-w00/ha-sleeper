@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Setup dev environment",
+      "type": "shell",
+      "command": "scripts/setup",
+      "problemMatcher": []
+    },
+    {
+      "label": "Run Home Assistant",
+      "type": "shell",
+      "command": "scripts/develop",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Test",
+      "type": "shell",
+      "command": "scripts/test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Lint",
+      "type": "shell",
+      "command": "scripts/lint",
+      "problemMatcher": []
+    },
+    {
+      "label": "Lint (fix)",
+      "type": "shell",
+      "command": "scripts/lint --fix",
+      "problemMatcher": []
+    }
+  ]
+}

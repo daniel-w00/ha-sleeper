@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Home Assistant dev config dir: keep only configuration.yaml and the symlink
+config/*
+!config/configuration.yaml
+!config/custom_components/
+config/custom_components/*
+!config/custom_components/sleeper
+
+# IDEs
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+
+# OS / misc
+.DS_Store
+*.log

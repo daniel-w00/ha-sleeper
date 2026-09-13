@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Lint, format-check and type-check. Pass --fix to apply ruff fixes and formatting.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if [[ "${1:-}" == "--fix" ]]; then
+    .venv/bin/ruff check --fix .
+    .venv/bin/ruff format .
+else
+    .venv/bin/ruff check .
+    .venv/bin/ruff format --check .
+fi
+
+.venv/bin/pyright

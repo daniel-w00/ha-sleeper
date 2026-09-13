@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Wipe the dev Home Assistant instance's state (users, config entries, database, logs).
+# configuration.yaml and the integration symlink are kept.
+# Afterwards start HA with scripts/develop and run scripts/onboard-dev (or use the browser).
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+if pgrep -f "hass --config" >/dev/null; then
+    echo "Home Assistant is running, stop it first (Ctrl+C in its terminal)." >&2
+    exit 1
+fi
+
+rm -rf config/.storage config/.cloud config/blueprints config/deps config/tts \
+    config/*.db config/*.db-* config/*.log config/*.log.* config/.HA_VERSION
+echo "Dev instance state removed."

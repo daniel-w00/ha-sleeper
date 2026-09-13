@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Home Assistant",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "homeassistant",
+      "args": ["--config", "${workspaceFolder}/config", "--debug"],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "Run tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests", "--no-cov"],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ]
+}
