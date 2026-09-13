@@ -72,7 +72,7 @@ def _matchup_attributes(data: SleeperLeagueData) -> dict[str, Any]:
                 "points": points,
             }
             for starter, points in zip(
-                data.my_starters, matchup.starters_points, strict=False
+                data.matchup_starters, matchup.starters_points, strict=False
             )
         ],
     }

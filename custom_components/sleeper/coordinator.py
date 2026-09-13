@@ -124,11 +124,8 @@ class SleeperLeagueData:
     player_lookup: PlayerLookup = _no_player
     points_changes: tuple[SleeperPointsChange, ...] = ()
 
-    @property
-    def my_starters(self) -> tuple[SleeperStarter, ...]:
-        """Return the account's starting line-up with slot names."""
-        if self.my_roster is None:
-            return ()
+    def _starters(self, player_ids: tuple[str, ...]) -> tuple[SleeperStarter, ...]:
+        """Resolve a list of starter IDs to slots and players."""
         slots = self.league.roster_positions
         return tuple(
             SleeperStarter(
@@ -136,8 +133,27 @@ class SleeperLeagueData:
                 player_id=player_id,
                 player=self.player_lookup(player_id),
             )
-            for index, player_id in enumerate(self.my_roster.starters)
+            for index, player_id in enumerate(player_ids)
         )
+
+    @property
+    def my_starters(self) -> tuple[SleeperStarter, ...]:
+        """Return the account's current line-up as set on the roster.
+
+        Sleeper lets you edit the line-up for the next week while the current
+        week is still being played, so this can differ from
+        ``matchup_starters``.
+        """
+        if self.my_roster is None:
+            return ()
+        return self._starters(self.my_roster.starters)
+
+    @property
+    def matchup_starters(self) -> tuple[SleeperStarter, ...]:
+        """Return the line-up locked in for the current week's matchup."""
+        if self.my_matchup is None:
+            return ()
+        return self._starters(self.my_matchup.starters)
 
     @property
     def starters_out(self) -> tuple[SleeperStarter, ...]:

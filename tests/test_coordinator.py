@@ -157,6 +157,7 @@ def test_no_roster_in_league() -> None:
 
     assert data.my_roster is None
     assert data.my_starters == ()
+    assert data.matchup_starters == ()
     assert data.starters_out == ()
     assert data.rank is None
     assert data.my_matchup is None

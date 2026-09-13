@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 from freezegun.api import FrozenDateTimeFactory
@@ -16,9 +17,12 @@ from pytest_homeassistant_custom_component.common import (
 )
 from syrupy.assertion import SnapshotAssertion
 
-from custom_components.sleeper.const import LEAGUE_REFRESH_INTERVAL
+from custom_components.sleeper.const import (
+    IDLE_SEASON_UPDATE_INTERVAL,
+    LEAGUE_REFRESH_INTERVAL,
+)
 
-from .conftest import LEAGUE_ID, TEST_USER_ID, async_poll
+from .conftest import LEAGUE_ID, TEST_USER_ID, async_poll, rosters_for
 
 
 @pytest.fixture(autouse=True)
@@ -147,3 +151,37 @@ async def test_sensors_without_own_roster(
     out = hass.states.get("sensor.wombats_league_starters_out")
     assert out is not None
     assert "starters" not in out.attributes
+
+
+async def test_roster_lineup_differs_from_matchup(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test the matchup shows the locked line-up while starters out uses the roster.
+
+    Sleeper lets you set next week's line-up while this week is still being
+    played; the roster then carries the new line-up.
+    """
+    rosters = list(rosters_for(LEAGUE_ID))
+    starters = list(rosters[0].starters)
+    starters[0] = "11581"  # bench RB (inactive) moved into the QB slot
+    rosters[0] = replace(rosters[0], starters=tuple(starters))
+    mock_client.get_rosters.side_effect = lambda league_id: (
+        tuple(rosters) if league_id == LEAGUE_ID else rosters_for(league_id)
+    )
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+
+    matchup = hass.states.get("sensor.wombats_league_matchup_points")
+    assert matchup is not None
+    assert matchup.attributes["starters"][0]["player"] == "Caleb Williams"
+
+    out = hass.states.get("sensor.wombats_league_starters_out")
+    assert out is not None
+    assert out.state == "3"
+    assert out.attributes["starters"][0] == {
+        "slot": "QB",
+        "player": "MarShawn Lloyd",
+        "status": "Inactive",
+    }

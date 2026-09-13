@@ -35,8 +35,12 @@ class SleeperPlayers:
         """Initialize the cache. Performs no I/O."""
         self.sport = sport
         self._client = SleeperClient(async_get_clientsession(hass), sport=sport)
+        # The stored copy is a few MB; serialize it off the event loop.
         self._store: Store[dict[str, Any]] = Store(
-            hass, STORAGE_VERSION, f"{DOMAIN}.players_{sport}"
+            hass,
+            STORAGE_VERSION,
+            f"{DOMAIN}.players_{sport}",
+            serialize_in_event_loop=False,
         )
         self._players: dict[str, SleeperPlayer] = {}
         self._fetched: datetime | None = None
