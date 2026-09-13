@@ -499,6 +499,108 @@
     'state': '0-0',
   })
 # ---
+# name: test_sensors[sensor.test_league_starters_out-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.test_league_starters_out',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Starters out',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Starters out',
+    'platform': 'sleeper',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'starters_out',
+    'unique_id': '123456789_1397743357073084416_starters_out',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.test_league_starters_out-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test League Starters out',
+      'starters': list([
+        dict({
+          'player': '0',
+          'slot': 'QB',
+          'status': 'Empty',
+        }),
+        dict({
+          'player': '0',
+          'slot': 'RB',
+          'status': 'Empty',
+        }),
+        dict({
+          'player': '0',
+          'slot': 'RB',
+          'status': 'Empty',
+        }),
+        dict({
+          'player': '0',
+          'slot': 'WR',
+          'status': 'Empty',
+        }),
+        dict({
+          'player': '0',
+          'slot': 'WR',
+          'status': 'Empty',
+        }),
+        dict({
+          'player': '0',
+          'slot': 'TE',
+          'status': 'Empty',
+        }),
+        dict({
+          'player': '0',
+          'slot': 'FLEX',
+          'status': 'Empty',
+        }),
+        dict({
+          'player': '0',
+          'slot': 'FLEX',
+          'status': 'Empty',
+        }),
+        dict({
+          'player': '0',
+          'slot': 'K',
+          'status': 'Empty',
+        }),
+        dict({
+          'player': '0',
+          'slot': 'DEF',
+          'status': 'Empty',
+        }),
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.test_league_starters_out',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '10',
+  })
+# ---
 # name: test_sensors[sensor.test_league_ties-entry]
   EntityRegistryEntrySnapshot({
     'aliases': list([
@@ -980,26 +1082,60 @@
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Wombats League Matchup points',
       'matchup_id': 6,
       'starters': list([
-        '11560',
-        '6813',
-        '9226',
-        '8144',
-        '9997',
-        '1466',
-        '12490',
-        '12711',
-        'PIT',
-      ]),
-      'starters_points': list([
-        17.66,
-        9.5,
-        0.0,
-        4.3,
-        23.5,
-        0.0,
-        3.7,
-        4.0,
-        9.0,
+        dict({
+          'player': 'Caleb Williams',
+          'player_id': '11560',
+          'points': 17.66,
+          'slot': 'QB',
+        }),
+        dict({
+          'player': 'Jonathan Taylor',
+          'player_id': '6813',
+          'points': 9.5,
+          'slot': 'RB',
+        }),
+        dict({
+          'player': "De'Von Achane",
+          'player_id': '9226',
+          'points': 0.0,
+          'slot': 'RB',
+        }),
+        dict({
+          'player': 'Chris Olave',
+          'player_id': '8144',
+          'points': 4.3,
+          'slot': 'WR',
+        }),
+        dict({
+          'player': 'Zay Flowers',
+          'player_id': '9997',
+          'points': 23.5,
+          'slot': 'WR',
+        }),
+        dict({
+          'player': 'Travis Kelce',
+          'player_id': '1466',
+          'points': 0.0,
+          'slot': 'TE',
+        }),
+        dict({
+          'player': 'Bhayshul Tuten',
+          'player_id': '12490',
+          'points': 3.7,
+          'slot': 'FLEX',
+        }),
+        dict({
+          'player': 'Tyler Loop',
+          'player_id': '12711',
+          'points': 4.0,
+          'slot': 'K',
+        }),
+        dict({
+          'player': 'Pittsburgh Steelers',
+          'player_id': 'PIT',
+          'points': 9.0,
+          'slot': 'DEF',
+        }),
       ]),
       <SensorEntityCapabilityAttribute.STATE_CLASS: 'state_class'>: <SensorStateClass.MEASUREMENT: 'measurement'>,
       <EntityStateAttribute.UNIT_OF_MEASUREMENT: 'unit_of_measurement'>: 'pts',
@@ -1337,6 +1473,68 @@
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': '0-0',
+  })
+# ---
+# name: test_sensors[sensor.wombats_league_starters_out-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.wombats_league_starters_out',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Starters out',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Starters out',
+    'platform': 'sleeper',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'starters_out',
+    'unique_id': '123456789_1392910061486997504_starters_out',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.wombats_league_starters_out-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Wombats League Starters out',
+      'starters': list([
+        dict({
+          'player': 'Zay Flowers',
+          'slot': 'WR',
+          'status': 'Out',
+        }),
+        dict({
+          'player': 'Travis Kelce',
+          'slot': 'TE',
+          'status': 'Out',
+        }),
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.wombats_league_starters_out',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2',
   })
 # ---
 # name: test_sensors[sensor.wombats_league_ties-entry]

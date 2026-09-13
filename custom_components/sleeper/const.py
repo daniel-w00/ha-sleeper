@@ -29,3 +29,18 @@ SEASON_TYPES: Final = ("pre", "regular", "post", "off")
 LEAGUE_STATUSES: Final = ("pre_draft", "drafting", "in_season", "complete")
 
 UNIT_POINTS: Final = "pts"
+
+# Player list: Sleeper asks for at most one download per day.
+PLAYERS_MAX_AGE: Final = timedelta(hours=24)
+# Wait this long before retrying a failed player list download.
+PLAYERS_RETRY_INTERVAL: Final = timedelta(hours=1)
+
+# Injury statuses (and the roster status) of players not expected to play.
+STARTER_OUT_INJURY_STATUSES: Final = frozenset(
+    {"Out", "Doubtful", "IR", "PUP", "Sus", "NA", "DNR"}
+)
+PLAYER_STATUS_INACTIVE: Final = "Inactive"
+# Sleeper fills empty starting slots with this placeholder ID.
+EMPTY_SLOT_PLAYER_ID: Final = "0"
+
+EVENT_POINTS_CHANGED: Final = "points_changed"

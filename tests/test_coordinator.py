@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.sleeper.api import (
@@ -14,6 +15,7 @@ from custom_components.sleeper.api import (
     SleeperLeague,
     SleeperLeagueUser,
     SleeperMatchup,
+    SleeperPlayer,
     SleeperRoster,
     SleeperSportState,
 )
@@ -27,6 +29,7 @@ from custom_components.sleeper.const import (
 from custom_components.sleeper.coordinator import (
     SleeperCoordinator,
     SleeperLeagueData,
+    SleeperStarter,
 )
 
 from .conftest import (
@@ -153,6 +156,8 @@ def test_no_roster_in_league() -> None:
     data = _league_data((_roster(1, "somebody"),), my_roster_id=None)
 
     assert data.my_roster is None
+    assert data.my_starters == ()
+    assert data.starters_out == ()
     assert data.rank is None
     assert data.my_matchup is None
     assert data.opponent_matchup is None
@@ -317,3 +322,39 @@ async def test_update_failed_and_recovery(
     assert week is not None
     assert week.state == "1"
     assert coordinator.data.leagues[LEAGUE_ID].my_roster is None
+
+
+def test_starters_without_player_list() -> None:
+    """Test starters fall back to IDs when no player list is available."""
+    roster = SleeperRoster.from_json(
+        {"roster_id": 1, "league_id": "1", "owner_id": "a", "starters": ["7", "0"]}
+    )
+    data = _league_data((roster,))
+
+    assert [starter.name for starter in data.my_starters] == ["7", "0"]
+    # Slots beyond the league's roster positions are unknown.
+    assert [starter.slot for starter in data.my_starters] == ["?", "?"]
+    assert [starter.status for starter in data.starters_out] == ["Empty"]
+
+
+@pytest.mark.parametrize(
+    ("player", "status"),
+    [
+        (None, None),
+        ({"status": "Active"}, None),
+        ({"status": "Active", "injury_status": "Questionable"}, None),
+        ({"status": "Active", "injury_status": "Doubtful"}, "Doubtful"),
+        ({"status": "Inactive"}, "Inactive"),
+    ],
+)
+def test_starter_status(player: dict[str, str] | None, status: str | None) -> None:
+    """Test which player states mark a starter as out."""
+    starter = SleeperStarter(
+        slot="QB",
+        player_id="7",
+        player=None
+        if player is None
+        else SleeperPlayer.from_json({"player_id": "7", **player}),
+    )
+
+    assert starter.status == status

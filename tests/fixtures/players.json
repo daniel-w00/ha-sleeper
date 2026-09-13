@@ -1,0 +1,495 @@
+{
+  "10232": {
+    "active": true,
+    "age": 26,
+    "fantasy_positions": [
+      "WR"
+    ],
+    "first_name": "Michael",
+    "full_name": "Michael Wilson",
+    "injury_status": null,
+    "last_name": "Wilson",
+    "number": 14,
+    "player_id": "10232",
+    "position": "WR",
+    "status": "Active",
+    "team": "ARI",
+    "years_exp": 3
+  },
+  "11560": {
+    "active": true,
+    "age": 24,
+    "fantasy_positions": [
+      "QB"
+    ],
+    "first_name": "Caleb",
+    "full_name": "Caleb Williams",
+    "injury_status": null,
+    "last_name": "Williams",
+    "number": 18,
+    "player_id": "11560",
+    "position": "QB",
+    "status": "Active",
+    "team": "CHI",
+    "years_exp": 2
+  },
+  "11581": {
+    "active": true,
+    "age": 25,
+    "fantasy_positions": [
+      "RB"
+    ],
+    "first_name": "MarShawn",
+    "full_name": "MarShawn Lloyd",
+    "injury_status": null,
+    "last_name": "Lloyd",
+    "number": 32,
+    "player_id": "11581",
+    "position": "RB",
+    "status": "Inactive",
+    "team": "GB",
+    "years_exp": 2
+  },
+  "11792": {
+    "active": true,
+    "age": 25,
+    "fantasy_positions": [
+      "K"
+    ],
+    "first_name": "Will",
+    "full_name": "Will Reichard",
+    "injury_status": null,
+    "last_name": "Reichard",
+    "number": 16,
+    "player_id": "11792",
+    "position": "K",
+    "status": "Active",
+    "team": "MIN",
+    "years_exp": 2
+  },
+  "12474": {
+    "active": true,
+    "age": 25,
+    "fantasy_positions": [
+      "RB"
+    ],
+    "first_name": "Woody",
+    "full_name": "Woody Marks",
+    "injury_status": null,
+    "last_name": "Marks",
+    "number": 4,
+    "player_id": "12474",
+    "position": "RB",
+    "status": "Active",
+    "team": "HOU",
+    "years_exp": 1
+  },
+  "12490": {
+    "active": true,
+    "age": 23,
+    "fantasy_positions": [
+      "RB"
+    ],
+    "first_name": "Bhayshul",
+    "full_name": "Bhayshul Tuten",
+    "injury_status": null,
+    "last_name": "Tuten",
+    "number": 33,
+    "player_id": "12490",
+    "position": "RB",
+    "status": "Active",
+    "team": "JAX",
+    "years_exp": 1
+  },
+  "12506": {
+    "active": true,
+    "age": 22,
+    "fantasy_positions": [
+      "TE"
+    ],
+    "first_name": "Harold",
+    "full_name": "Harold Fannin",
+    "injury_status": null,
+    "last_name": "Fannin",
+    "number": 44,
+    "player_id": "12506",
+    "position": "TE",
+    "status": "Active",
+    "team": "CLE",
+    "years_exp": 1
+  },
+  "12529": {
+    "active": true,
+    "age": 23,
+    "fantasy_positions": [
+      "RB"
+    ],
+    "first_name": "TreVeyon",
+    "full_name": "TreVeyon Henderson",
+    "injury_status": "Out",
+    "last_name": "Henderson",
+    "number": 32,
+    "player_id": "12529",
+    "position": "RB",
+    "status": "Active",
+    "team": "NE",
+    "years_exp": 1
+  },
+  "12711": {
+    "active": true,
+    "age": 25,
+    "fantasy_positions": [
+      "K"
+    ],
+    "first_name": "Tyler",
+    "full_name": "Tyler Loop",
+    "injury_status": null,
+    "last_name": "Loop",
+    "number": 33,
+    "player_id": "12711",
+    "position": "K",
+    "status": "Active",
+    "team": "BAL",
+    "years_exp": 1
+  },
+  "13298": {
+    "active": true,
+    "age": 21,
+    "fantasy_positions": [
+      "WR"
+    ],
+    "first_name": "KC",
+    "full_name": "KC Concepcion",
+    "injury_status": null,
+    "last_name": "Concepcion",
+    "number": 1,
+    "player_id": "13298",
+    "position": "WR",
+    "status": "Active",
+    "team": "CLE",
+    "years_exp": 0
+  },
+  "1466": {
+    "active": true,
+    "age": 36,
+    "fantasy_positions": [
+      "TE"
+    ],
+    "first_name": "Travis",
+    "full_name": "Travis Kelce",
+    "injury_status": "Out",
+    "last_name": "Kelce",
+    "number": 87,
+    "player_id": "1466",
+    "position": "TE",
+    "status": "Active",
+    "team": "KC",
+    "years_exp": 13
+  },
+  "5859": {
+    "active": true,
+    "age": 29,
+    "fantasy_positions": [
+      "WR"
+    ],
+    "first_name": "A.J.",
+    "full_name": "A.J. Brown",
+    "injury_status": "IR",
+    "last_name": "Brown",
+    "number": 1,
+    "player_id": "5859",
+    "position": "WR",
+    "status": "Inactive",
+    "team": "NE",
+    "years_exp": 7
+  },
+  "5927": {
+    "active": true,
+    "age": 30,
+    "fantasy_positions": [
+      "WR"
+    ],
+    "first_name": "Terry",
+    "full_name": "Terry McLaurin",
+    "injury_status": null,
+    "last_name": "McLaurin",
+    "number": 17,
+    "player_id": "5927",
+    "position": "WR",
+    "status": "Active",
+    "team": "WAS",
+    "years_exp": 7
+  },
+  "6813": {
+    "active": true,
+    "age": 27,
+    "fantasy_positions": [
+      "RB"
+    ],
+    "first_name": "Jonathan",
+    "full_name": "Jonathan Taylor",
+    "injury_status": null,
+    "last_name": "Taylor",
+    "number": 28,
+    "player_id": "6813",
+    "position": "RB",
+    "status": "Active",
+    "team": "IND",
+    "years_exp": 6
+  },
+  "6819": {
+    "active": true,
+    "age": 28,
+    "fantasy_positions": [
+      "WR"
+    ],
+    "first_name": "Michael",
+    "full_name": "Michael Pittman",
+    "injury_status": null,
+    "last_name": "Pittman",
+    "number": 11,
+    "player_id": "6819",
+    "position": "WR",
+    "status": "Active",
+    "team": "PIT",
+    "years_exp": 6
+  },
+  "6904": {
+    "active": true,
+    "age": 28,
+    "fantasy_positions": [
+      "QB"
+    ],
+    "first_name": "Jalen",
+    "full_name": "Jalen Hurts",
+    "injury_status": null,
+    "last_name": "Hurts",
+    "number": 1,
+    "player_id": "6904",
+    "position": "QB",
+    "status": "Active",
+    "team": "PHI",
+    "years_exp": 6
+  },
+  "7002": {
+    "active": true,
+    "age": 30,
+    "fantasy_positions": [
+      "TE"
+    ],
+    "first_name": "Juwan",
+    "full_name": "Juwan Johnson",
+    "injury_status": null,
+    "last_name": "Johnson",
+    "number": 83,
+    "player_id": "7002",
+    "position": "TE",
+    "status": "Active",
+    "team": "NO",
+    "years_exp": 6
+  },
+  "8126": {
+    "active": true,
+    "age": 25,
+    "fantasy_positions": [
+      "WR"
+    ],
+    "first_name": "Wan'Dale",
+    "full_name": "Wan'Dale Robinson",
+    "injury_status": null,
+    "last_name": "Robinson",
+    "number": 4,
+    "player_id": "8126",
+    "position": "WR",
+    "status": "Active",
+    "team": "TEN",
+    "years_exp": 4
+  },
+  "8136": {
+    "active": true,
+    "age": 27,
+    "fantasy_positions": [
+      "RB"
+    ],
+    "first_name": "Rachaad",
+    "full_name": "Rachaad White",
+    "injury_status": null,
+    "last_name": "White",
+    "number": 1,
+    "player_id": "8136",
+    "position": "RB",
+    "status": "Active",
+    "team": "WAS",
+    "years_exp": 4
+  },
+  "8138": {
+    "active": true,
+    "age": 26,
+    "fantasy_positions": [
+      "RB"
+    ],
+    "first_name": "James",
+    "full_name": "James Cook",
+    "injury_status": null,
+    "last_name": "Cook",
+    "number": 4,
+    "player_id": "8138",
+    "position": "RB",
+    "status": "Active",
+    "team": "BUF",
+    "years_exp": 4
+  },
+  "8142": {
+    "active": true,
+    "age": 26,
+    "fantasy_positions": [
+      "WR"
+    ],
+    "first_name": "Alec",
+    "full_name": "Alec Pierce",
+    "injury_status": null,
+    "last_name": "Pierce",
+    "number": 14,
+    "player_id": "8142",
+    "position": "WR",
+    "status": "Active",
+    "team": "IND",
+    "years_exp": 4
+  },
+  "8144": {
+    "active": true,
+    "age": 26,
+    "fantasy_positions": [
+      "WR"
+    ],
+    "first_name": "Chris",
+    "full_name": "Chris Olave",
+    "injury_status": null,
+    "last_name": "Olave",
+    "number": 12,
+    "player_id": "8144",
+    "position": "WR",
+    "status": "Active",
+    "team": "NO",
+    "years_exp": 4
+  },
+  "8146": {
+    "active": true,
+    "age": 26,
+    "fantasy_positions": [
+      "WR"
+    ],
+    "first_name": "Garrett",
+    "full_name": "Garrett Wilson",
+    "injury_status": null,
+    "last_name": "Wilson",
+    "number": 5,
+    "player_id": "8146",
+    "position": "WR",
+    "status": "Active",
+    "team": "NYJ",
+    "years_exp": 4
+  },
+  "8155": {
+    "active": true,
+    "age": 25,
+    "fantasy_positions": [
+      "RB"
+    ],
+    "first_name": "Breece",
+    "full_name": "Breece Hall",
+    "injury_status": null,
+    "last_name": "Hall",
+    "number": 20,
+    "player_id": "8155",
+    "position": "RB",
+    "status": "Active",
+    "team": "NYJ",
+    "years_exp": 4
+  },
+  "9226": {
+    "active": true,
+    "age": 24,
+    "fantasy_positions": [
+      "RB"
+    ],
+    "first_name": "De'Von",
+    "full_name": "De'Von Achane",
+    "injury_status": "Questionable",
+    "last_name": "Achane",
+    "number": 28,
+    "player_id": "9226",
+    "position": "RB",
+    "status": "Active",
+    "team": "MIA",
+    "years_exp": 3
+  },
+  "9753": {
+    "active": true,
+    "age": 25,
+    "fantasy_positions": [
+      "RB"
+    ],
+    "first_name": "Zach",
+    "full_name": "Zach Charbonnet",
+    "injury_status": "PUP",
+    "last_name": "Charbonnet",
+    "number": 26,
+    "player_id": "9753",
+    "position": "RB",
+    "status": "Active",
+    "team": "SEA",
+    "years_exp": 3
+  },
+  "9997": {
+    "active": true,
+    "age": 26,
+    "fantasy_positions": [
+      "WR"
+    ],
+    "first_name": "Zay",
+    "full_name": "Zay Flowers",
+    "injury_status": "Out",
+    "last_name": "Flowers",
+    "number": 4,
+    "player_id": "9997",
+    "position": "WR",
+    "status": "Active",
+    "team": "BAL",
+    "years_exp": 3
+  },
+  "JAX": {
+    "active": true,
+    "age": null,
+    "fantasy_positions": [
+      "DEF"
+    ],
+    "first_name": "Jacksonville",
+    "full_name": null,
+    "injury_status": null,
+    "last_name": "Jaguars",
+    "number": null,
+    "player_id": "JAX",
+    "position": "DEF",
+    "status": null,
+    "team": "JAX",
+    "years_exp": null
+  },
+  "PIT": {
+    "active": true,
+    "age": null,
+    "fantasy_positions": [
+      "DEF"
+    ],
+    "first_name": "Pittsburgh",
+    "full_name": null,
+    "injury_status": null,
+    "last_name": "Steelers",
+    "number": null,
+    "player_id": "PIT",
+    "position": "DEF",
+    "status": null,
+    "team": "PIT",
+    "years_exp": null
+  }
+}

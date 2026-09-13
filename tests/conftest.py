@@ -26,6 +26,7 @@ from custom_components.sleeper.api import (
     SleeperLeague,
     SleeperLeagueUser,
     SleeperMatchup,
+    SleeperPlayer,
     SleeperRoster,
     SleeperSportState,
     SleeperUser,
@@ -54,6 +55,14 @@ async def async_poll(
     freezer.tick(delta)
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
+
+
+def players_fixture() -> dict[str, SleeperPlayer]:
+    """Return the fixture players, as the client would deliver them."""
+    return {
+        player_id: SleeperPlayer.from_json(item)
+        for player_id, item in load_json_fixture("players.json").items()
+    }
 
 
 def rosters_for(league_id: str) -> tuple[SleeperRoster, ...]:
@@ -139,6 +148,10 @@ def mock_client(
             "custom_components.sleeper.coordinator.SleeperClient",
             new=flow_client,
         ),
+        patch(
+            "custom_components.sleeper.players.SleeperClient",
+            new=flow_client,
+        ),
     ):
         client = flow_client.return_value
         client.get_user = AsyncMock(return_value=mock_user)
@@ -147,6 +160,7 @@ def mock_client(
         client.get_league_users = AsyncMock(return_value=league_users)
         client.get_rosters = AsyncMock(side_effect=rosters_for)
         client.get_matchups = AsyncMock(side_effect=matchups_for)
+        client.get_players = AsyncMock(return_value=players_fixture())
         yield client
 
 

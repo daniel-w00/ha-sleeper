@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass
+import json
 import logging
 from types import MappingProxyType
 from typing import Any, Self
@@ -32,6 +33,8 @@ _LOGGER = logging.getLogger(__name__)
 
 BASE_URL = "https://api.sleeper.app/v1"
 DEFAULT_TIMEOUT = 10
+# The player list is >10 MB; give slow connections a chance.
+PLAYERS_TIMEOUT = 60
 
 # ``waiver_type`` values in the league settings.
 WAIVER_TYPE_ROLLING = 0
@@ -273,6 +276,64 @@ class SleeperMatchup:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class SleeperPlayer:
+    """A player (or team defense) from Sleeper's player list.
+
+    Only the fields the integration needs are kept; the full player objects
+    carry ~50 fields each and the list is several megabytes.
+    """
+
+    player_id: str
+    first_name: str
+    last_name: str
+    position: str | None
+    team: str | None
+    status: str | None
+    injury_status: str | None
+    fantasy_positions: tuple[str, ...]
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> Self:
+        """Build a player from an API response object (or a stored copy)."""
+        return cls(
+            player_id=str(data["player_id"]),
+            first_name=data.get("first_name") or "",
+            last_name=data.get("last_name") or "",
+            position=data.get("position") or None,
+            team=data.get("team") or None,
+            status=data.get("status") or None,
+            injury_status=data.get("injury_status") or None,
+            fantasy_positions=_str_tuple(data.get("fantasy_positions")),
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return the player in the shape ``from_json`` accepts."""
+        return {
+            "player_id": self.player_id,
+            "first_name": self.first_name,
+            "last_name": self.last_name,
+            "position": self.position,
+            "team": self.team,
+            "status": self.status,
+            "injury_status": self.injury_status,
+            "fantasy_positions": list(self.fantasy_positions),
+        }
+
+    @property
+    def name(self) -> str:
+        """Return the full name; team defenses read like "Pittsburgh Steelers"."""
+        return f"{self.first_name} {self.last_name}".strip() or self.player_id
+
+
+def _parse_players(text: str) -> dict[str, SleeperPlayer]:
+    """Decode the player list. CPU heavy, meant to run in an executor."""
+    data: dict[str, dict[str, Any]] = json.loads(text) or {}
+    return {
+        player_id: SleeperPlayer.from_json(item) for player_id, item in data.items()
+    }
+
+
 def _optional_str(value: Any) -> str | None:
     """Return the value as a string, or ``None`` if it is missing."""
     return None if value is None else str(value)
@@ -330,13 +391,19 @@ class SleeperClient:
 
     async def _get(self, path: str) -> Any:
         """Perform a GET request and return the decoded JSON body."""
+        return json.loads(await self._get_text(path))
+
+    async def _get_text(
+        self, path: str, *, request_timeout: float | None = None
+    ) -> str:
+        """Perform a GET request and return the raw body."""
         url = f"{BASE_URL}/{path.lstrip('/')}"
         _LOGGER.debug("GET %s", url)
         try:
-            async with asyncio.timeout(self._timeout):
+            async with asyncio.timeout(request_timeout or self._timeout):
                 response = await self._session.get(url)
                 response.raise_for_status()
-                return await response.json()
+                return await response.text()
         except ClientResponseError as err:
             if err.status == 404:
                 raise SleeperNotFoundError(path) from err
@@ -390,6 +457,20 @@ class SleeperClient:
         """Fetch all members of a league."""
         data = await self._get_list(f"league/{league_id}/users")
         return tuple(SleeperLeagueUser.from_json(item) for item in data)
+
+    async def get_players(self) -> dict[str, SleeperPlayer]:
+        """Fetch all active players of the sport, keyed by player ID.
+
+        The response is over 10 MB. Sleeper asks for this call to be made at
+        most once per day; callers must cache the result. Decoding happens in
+        the default executor so the event loop is not blocked.
+        """
+        text = await self._get_text(
+            f"players/{self._sport}?active=true", request_timeout=PLAYERS_TIMEOUT
+        )
+        return await asyncio.get_running_loop().run_in_executor(
+            None, _parse_players, text
+        )
 
     async def get_matchups(
         self, league_id: str, week: int

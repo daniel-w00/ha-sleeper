@@ -10,8 +10,9 @@ Home Assistant entities, so you can build dashboards and automations around your
 season: get notified when your matchup score changes, show the current week on a wall
 tablet, or flash the lights when you take the lead.
 
-> **Status:** early development. Standings, live matchup scores and waiver information of
-> all your leagues are available; player names, transactions, playoffs and drafts are planned.
+> **Status:** early development. Standings, live matchup scores with player names, scoring
+> events and waiver information of all your leagues are available; transactions, playoffs
+> and drafts are planned.
 
 ## Prerequisites
 
@@ -74,15 +75,46 @@ These describe the NFL season itself, not the account; they are the same for eve
 | Ties | Disabled by default; enable it if your league allows ties. |
 | Rank | Your position in the standings (win percentage, then points for). |
 | Points for, Points against | Season totals. Updated by Sleeper once a week is final. |
-| Matchup points | Your live points in this week's matchup. Attributes: week, matchup ID, starters (Sleeper player IDs) and their points. |
+| Matchup points | Your live points in this week's matchup. Attributes: week, matchup ID, and your starters with slot, name and points. |
+| Starters out | Number of your starters not expected to play: injury status Out, Doubtful, IR, PUP, suspended or similar, inactive players, and empty slots. Attribute: the affected starters with slot and reason. Questionable players are not counted. |
 | Opponent points | Your opponent's live points. |
 | Opponent | Your opponent's team name (or display name). Attributes: roster ID, record. |
 | Leading matchup | Binary sensor: on while your points exceed your opponent's. Attribute: margin. |
 | Waiver position | Your position in the waiver order. |
 | Waiver budget remaining | Only in FAAB leagues. Attributes: budget, used. |
+| Player scoring | Event entity. Fires once per player whose points changed since the last poll, for both sides of your matchup, starters and bench. Attributes: player, player ID, position, team, roster ID, own player, starter, previous points, points, change, week, matchup ID. |
 
 Matchup entities are `unknown` on a bye week, before the draft and outside the regular and
 post season.
+
+### Reacting to big plays
+
+The **Player scoring** event fires for every point change of a player in your matchup. To
+celebrate a touchdown-sized play by one of your starters, trigger on the event entity and
+check its attributes:
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: event.my_league_player_scoring
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.to_state.attributes.is_mine
+         and trigger.to_state.attributes.is_starter
+         and trigger.to_state.attributes.delta >= 6 }}
+actions:
+  - action: notify.mobile_app_phone
+    data:
+      message: >-
+        {{ trigger.to_state.attributes.player }} just scored
+        {{ trigger.to_state.attributes.delta }} points!
+```
+
+Sleeper updates points about once a minute, so two quick plays by the same player can arrive
+as one change, and a change of six or more points is usually, but not always, a touchdown.
+When several players change in the same poll, one event fires per player; the entity ends on
+your own biggest gain.
 
 ### Season rollover
 
@@ -106,6 +138,12 @@ The integration polls the Sleeper API and adapts the interval to what is happeni
 change the intervals; if you need an update right now, call the `homeassistant.update_entity`
 action on any Sleeper entity.
 
+Player names, positions and injury statuses come from Sleeper's player list, which is over
+10 MB. It is downloaded once per day at most, shared by all accounts, and kept in Home
+Assistant's storage so a restart does not download it again. If the download fails, the
+integration keeps working and shows player IDs instead of names until the next attempt an
+hour later.
+
 ## Known limitations
 
 - Only NFL leagues are supported.
@@ -114,8 +152,9 @@ action on any Sleeper entity.
 - The Sleeper API does not publish the NFL schedule, so the first score change of a game
   day is noticed at the idle interval (up to 15 minutes late). After that, updates run every
   60 seconds until scores stop changing.
-- Starters are shown as Sleeper player IDs. Player names, injuries, transactions, playoff
-  brackets and drafts are planned for a later release.
+- A win probability like the one in the Sleeper app is not available: Sleeper does not
+  publish it.
+- Transactions, playoff brackets and drafts are planned for a later release.
 
 ## Removal
 

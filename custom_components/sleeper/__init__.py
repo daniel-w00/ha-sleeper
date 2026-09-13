@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.const import Platform
@@ -11,13 +12,17 @@ from homeassistant.helpers.device_registry import DeviceEntryType
 
 from .const import DOMAIN
 from .coordinator import SleeperConfigEntry, SleeperCoordinator
+from .players import async_get_players
 
-PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR]
+_LOGGER = logging.getLogger(__name__)
+
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.EVENT, Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SleeperConfigEntry) -> bool:
     """Set up Sleeper from a config entry."""
-    coordinator = SleeperCoordinator(hass, entry)
+    players = await async_get_players(hass)
+    coordinator = SleeperCoordinator(hass, entry, players)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
 

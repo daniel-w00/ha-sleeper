@@ -64,8 +64,29 @@ def _matchup_attributes(data: SleeperLeagueData) -> dict[str, Any]:
     return {
         "week": data.week,
         "matchup_id": matchup.matchup_id,
-        "starters": list(matchup.starters),
-        "starters_points": list(matchup.starters_points),
+        "starters": [
+            {
+                "slot": starter.slot,
+                "player": starter.name,
+                "player_id": starter.player_id,
+                "points": points,
+            }
+            for starter, points in zip(
+                data.my_starters, matchup.starters_points, strict=False
+            )
+        ],
+    }
+
+
+def _starters_out_attributes(data: SleeperLeagueData) -> dict[str, Any]:
+    """Return which starters are not expected to play and why."""
+    if data.my_roster is None:
+        return {}
+    return {
+        "starters": [
+            {"slot": starter.slot, "player": starter.name, "status": starter.status}
+            for starter in data.starters_out
+        ],
     }
 
 
@@ -180,6 +201,14 @@ LEAGUE_SENSORS: tuple[SleeperLeagueSensorEntityDescription, ...] = (
         suggested_display_precision=2,
         value_fn=_matchup_value(lambda matchup: matchup.points),
         attributes_fn=_matchup_attributes,
+    ),
+    SleeperLeagueSensorEntityDescription(
+        key="starters_out",
+        translation_key="starters_out",
+        value_fn=lambda data: (
+            None if data.my_roster is None else len(data.starters_out)
+        ),
+        attributes_fn=_starters_out_attributes,
     ),
     SleeperLeagueSensorEntityDescription(
         key="opponent_points",

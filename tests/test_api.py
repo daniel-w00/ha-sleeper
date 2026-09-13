@@ -19,6 +19,7 @@ from custom_components.sleeper.api import (
     SleeperLeague,
     SleeperMatchup,
     SleeperNotFoundError,
+    SleeperPlayer,
     SleeperRoster,
 )
 
@@ -441,3 +442,51 @@ async def test_get_matchups_empty(
     )
 
     assert await client.get_matchups("2", 1) == ()
+
+
+async def test_get_players(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test fetching the player list."""
+    aioclient_mock.get(
+        f"{BASE_URL}/players/nfl?active=true",
+        json=load_json_fixture("players.json"),
+    )
+
+    players = await client.get_players()
+
+    assert len(players) == 29
+    caleb = players["11560"]
+    assert caleb.name == "Caleb Williams"
+    assert caleb.position == "QB"
+    assert caleb.team == "CHI"
+    assert caleb.status == "Active"
+    assert caleb.injury_status is None
+    assert caleb.fantasy_positions == ("QB",)
+    defense = players["PIT"]
+    assert defense.name == "Pittsburgh Steelers"
+    assert defense.position == "DEF"
+    assert players["1466"].injury_status == "Out"
+    # Round trip through the stored representation.
+    assert SleeperPlayer.from_json(caleb.as_dict()) == caleb
+
+
+async def test_get_players_null(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test a null player list is empty."""
+    aioclient_mock.get(
+        f"{BASE_URL}/players/nfl?active=true", text="null", headers=JSON_HEADERS
+    )
+
+    assert await client.get_players() == {}
+
+
+def test_player_without_names() -> None:
+    """Test a player record with missing fields falls back to the ID."""
+    player = SleeperPlayer.from_json({"player_id": 42, "injury_status": ""})
+
+    assert player.name == "42"
+    assert player.position is None
+    assert player.injury_status is None
+    assert player.fantasy_positions == ()

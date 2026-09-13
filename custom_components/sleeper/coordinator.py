@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 import logging
 from typing import TYPE_CHECKING, override
@@ -20,6 +21,7 @@ from .api import (
     SleeperLeague,
     SleeperLeagueUser,
     SleeperMatchup,
+    SleeperPlayer,
     SleeperRoster,
     SleeperSportState,
     SleeperUser,
@@ -27,18 +29,81 @@ from .api import (
 from .const import (
     DEFAULT_SPORT,
     DOMAIN,
+    EMPTY_SLOT_PLAYER_ID,
     IDLE_OFFSEASON_UPDATE_INTERVAL,
     IDLE_SEASON_UPDATE_INTERVAL,
     LEAGUE_REFRESH_INTERVAL,
     LEAGUE_STATUS_IN_SEASON,
     LIVE_GRACE_PERIOD,
     LIVE_UPDATE_INTERVAL,
+    PLAYER_STATUS_INACTIVE,
     SCORING_SEASON_TYPES,
+    STARTER_OUT_INJURY_STATUSES,
 )
+from .players import SleeperPlayers
 
 _LOGGER = logging.getLogger(__name__)
 
 type SleeperConfigEntry = ConfigEntry[SleeperCoordinator]
+
+type PlayerLookup = Callable[[str], SleeperPlayer | None]
+
+
+def _no_player(player_id: str) -> SleeperPlayer | None:
+    """Player lookup used when no player list is available."""
+    return None
+
+
+@dataclass(frozen=True, slots=True)
+class SleeperPointsChange:
+    """A player's fantasy points changed between two polls."""
+
+    roster_id: int
+    player_id: str
+    player: SleeperPlayer | None
+    previous: float
+    points: float
+    is_starter: bool
+    is_mine: bool
+
+    @property
+    def delta(self) -> float:
+        """Return the change in points."""
+        return round(self.points - self.previous, 2)
+
+
+@dataclass(frozen=True, slots=True)
+class SleeperStarter:
+    """A starting slot of the account's roster."""
+
+    slot: str
+    player_id: str
+    player: SleeperPlayer | None
+
+    @property
+    def name(self) -> str:
+        """Return the player's name, the ID if unknown, or ``None`` when empty."""
+        if self.player is not None:
+            return self.player.name
+        return self.player_id
+
+    @property
+    def is_empty(self) -> bool:
+        """Return whether the slot has no player."""
+        return self.player_id == EMPTY_SLOT_PLAYER_ID
+
+    @property
+    def status(self) -> str | None:
+        """Return the reason the starter is not expected to play, if any."""
+        if self.is_empty:
+            return "Empty"
+        if self.player is None:
+            return None
+        if self.player.injury_status in STARTER_OUT_INJURY_STATUSES:
+            return self.player.injury_status
+        if self.player.status == PLAYER_STATUS_INACTIVE:
+            return self.player.status
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +121,30 @@ class SleeperLeagueData:
     matchups: tuple[SleeperMatchup, ...]
     week: int
     my_roster: SleeperRoster | None
+    player_lookup: PlayerLookup = _no_player
+    points_changes: tuple[SleeperPointsChange, ...] = ()
+
+    @property
+    def my_starters(self) -> tuple[SleeperStarter, ...]:
+        """Return the account's starting line-up with slot names."""
+        if self.my_roster is None:
+            return ()
+        slots = self.league.roster_positions
+        return tuple(
+            SleeperStarter(
+                slot=slots[index] if index < len(slots) else "?",
+                player_id=player_id,
+                player=self.player_lookup(player_id),
+            )
+            for index, player_id in enumerate(self.my_roster.starters)
+        )
+
+    @property
+    def starters_out(self) -> tuple[SleeperStarter, ...]:
+        """Return starters not expected to play, including empty slots."""
+        return tuple(
+            starter for starter in self.my_starters if starter.status is not None
+        )
 
     def user_for_roster(self, roster: SleeperRoster) -> SleeperLeagueUser | None:
         """Return the league member owning a roster, if any."""
@@ -162,7 +251,12 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
 
     config_entry: SleeperConfigEntry
 
-    def __init__(self, hass: HomeAssistant, config_entry: SleeperConfigEntry) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        config_entry: SleeperConfigEntry,
+        players: SleeperPlayers,
+    ) -> None:
         """Initialize the coordinator."""
         super().__init__(
             hass,
@@ -175,6 +269,7 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             assert config_entry.unique_id is not None
         self.sport: str = DEFAULT_SPORT
         self.client = SleeperClient(async_get_clientsession(hass), sport=self.sport)
+        self.players = players
         self.user_id: str = config_entry.unique_id
         self._user: SleeperUser | None = None
         self._leagues: tuple[SleeperLeague, ...] = ()
@@ -183,6 +278,8 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         self._leagues_refreshed: datetime | None = None
         self._last_points: dict[tuple[str, int], float] = {}
         self._last_points_change: datetime | None = None
+        # (league_id, week, roster_id, player_id) -> points of the last poll
+        self._last_player_points: dict[tuple[str, int, int, str], float] = {}
 
     @override
     async def _async_update_data(self) -> SleeperData:
@@ -199,9 +296,16 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         except SleeperError as err:
             raise UpdateFailed(f"Error communicating with Sleeper: {err}") from err
 
+        # Player names are a nicety: a failed download must not fail the poll.
+        try:
+            await self.players.async_refresh_if_stale()
+        except SleeperError as err:
+            _LOGGER.warning("Could not download the Sleeper player list: %s", err)
+
         if TYPE_CHECKING:
             assert self._user is not None
         self._update_interval_for(now, state, leagues)
+        leagues = self._detect_points_changes(leagues)
         return SleeperData(user=self._user, state=state, leagues=leagues)
 
     def _leagues_need_refresh(self, now: datetime, state: SleeperSportState) -> bool:
@@ -277,7 +381,49 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
                 (roster for roster in rosters if roster.owner_id == self.user_id),
                 None,
             ),
+            player_lookup=self.players.get,
         )
+
+    def _detect_points_changes(
+        self, leagues: dict[str, SleeperLeagueData]
+    ) -> dict[str, SleeperLeagueData]:
+        """Compare player points of the account's matchups with the last poll.
+
+        Only both rosters of the account's own matchup are watched. Keys
+        include the week, so a new week starts from scratch instead of
+        reporting every player dropping to zero.
+        """
+        current: dict[tuple[str, int, int, str], float] = {}
+        result: dict[str, SleeperLeagueData] = {}
+        for league_id, data in leagues.items():
+            changes: list[SleeperPointsChange] = []
+            for matchup in (data.my_matchup, data.opponent_matchup):
+                if matchup is None:
+                    continue
+                is_mine = matchup is data.my_matchup
+                starters = set(matchup.starters)
+                for player_id, points in matchup.players_points.items():
+                    key = (league_id, data.week, matchup.roster_id, player_id)
+                    current[key] = points
+                    previous = self._last_player_points.get(key)
+                    if previous is None or previous == points:
+                        continue
+                    changes.append(
+                        SleeperPointsChange(
+                            roster_id=matchup.roster_id,
+                            player_id=player_id,
+                            player=self.players.get(player_id),
+                            previous=previous,
+                            points=points,
+                            is_starter=player_id in starters,
+                            is_mine=is_mine,
+                        )
+                    )
+            result[league_id] = (
+                replace(data, points_changes=tuple(changes)) if changes else data
+            )
+        self._last_player_points = current
+        return result
 
     def _update_interval_for(
         self,

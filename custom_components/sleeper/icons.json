@@ -8,6 +8,11 @@
         }
       }
     },
+    "event": {
+      "player_scoring": {
+        "default": "mdi:bullhorn"
+      }
+    },
     "sensor": {
       "week": {
         "default": "mdi:calendar-week"
@@ -44,6 +49,9 @@
       },
       "matchup_points": {
         "default": "mdi:football"
+      },
+      "starters_out": {
+        "default": "mdi:medical-bag"
       },
       "opponent_points": {
         "default": "mdi:football-helmet"

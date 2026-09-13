@@ -57,6 +57,7 @@ async def test_sensor_values(
         ("sensor.wombats_league_points_for", "0.0"),
         ("sensor.wombats_league_points_against", "0.0"),
         ("sensor.wombats_league_matchup_points", "71.66"),
+        ("sensor.wombats_league_starters_out", "2"),
         ("sensor.wombats_league_opponent_points", "35.9"),
         ("sensor.wombats_league_opponent", "user_12"),
         ("sensor.wombats_league_waiver_position", "6"),
@@ -64,6 +65,7 @@ async def test_sensor_values(
         ("sensor.test_league_league_status", "pre_draft"),
         ("sensor.test_league_record", "0-0"),
         ("sensor.test_league_matchup_points", STATE_UNKNOWN),
+        ("sensor.test_league_starters_out", "10"),
         ("sensor.test_league_opponent_points", STATE_UNKNOWN),
         ("sensor.test_league_opponent", STATE_UNKNOWN),
     ):
@@ -75,8 +77,29 @@ async def test_sensor_values(
     assert matchup is not None
     assert matchup.attributes["week"] == 1
     assert matchup.attributes["matchup_id"] == 6
-    assert matchup.attributes["starters"][-1] == "PIT"
-    assert matchup.attributes["starters_points"][0] == 17.66
+    assert matchup.attributes["starters"][0] == {
+        "slot": "QB",
+        "player": "Caleb Williams",
+        "player_id": "11560",
+        "points": 17.66,
+    }
+    assert matchup.attributes["starters"][-1]["player"] == "Pittsburgh Steelers"
+    assert matchup.attributes["starters"][-1]["slot"] == "DEF"
+
+    # Two starters are out; the questionable RB is not counted.
+    out = hass.states.get("sensor.wombats_league_starters_out")
+    assert out is not None
+    assert out.attributes["starters"] == [
+        {"slot": "WR", "player": "Zay Flowers", "status": "Out"},
+        {"slot": "TE", "player": "Travis Kelce", "status": "Out"},
+    ]
+    out = hass.states.get("sensor.test_league_starters_out")
+    assert out is not None
+    assert out.attributes["starters"][0] == {
+        "slot": "QB",
+        "player": "0",
+        "status": "Empty",
+    }
 
     opponent = hass.states.get("sensor.wombats_league_opponent")
     assert opponent is not None
@@ -109,6 +132,7 @@ async def test_sensors_without_own_roster(
         "sensor.wombats_league_record",
         "sensor.wombats_league_rank",
         "sensor.wombats_league_points_for",
+        "sensor.wombats_league_starters_out",
         "sensor.wombats_league_waiver_budget_remaining",
     ):
         state = hass.states.get(entity_id)
@@ -120,3 +144,6 @@ async def test_sensors_without_own_roster(
     budget = hass.states.get("sensor.wombats_league_waiver_budget_remaining")
     assert budget is not None
     assert "budget" not in budget.attributes
+    out = hass.states.get("sensor.wombats_league_starters_out")
+    assert out is not None
+    assert "starters" not in out.attributes
