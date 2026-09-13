@@ -52,8 +52,10 @@ want a league in Home Assistant, disable its device under
 
 ## Entities
 
-The integration creates one **account device** and one **device per league**. Entity IDs
-follow the pattern `sensor.<account>_<name>` and `sensor.<league>_<name>`.
+The integration creates one **account device** and one **device per league** of that
+account. Entity IDs follow the pattern `sensor.<account>_<name>` and `sensor.<league>_<name>`.
+If two accounts share a league, each gets its own league device; the second account's
+entity IDs get a `_2` suffix.
 
 ### Account
 
@@ -70,9 +72,7 @@ These describe the NFL season itself, not the account; they are the same for eve
 | Entity | Description |
 |---|---|
 | League status | `pre_draft`, `drafting`, `in_season` or `complete`. Attributes: season, number of teams, playoff start week, playoff teams, scoring format (PPR, half PPR, standard). |
-| Record | Your record as `W-L` or `W-L-T`. Attributes: wins, losses, ties. |
-| Wins, Losses | Your season record as numbers. |
-| Ties | Disabled by default; enable it if your league allows ties. |
+| Record | Your record as `W-L` or `W-L-T`. Attributes: wins, losses, ties as numbers for automations. |
 | Rank | Your position in the standings (win percentage, then points for). |
 | Points for, Points against | Season totals. Updated by Sleeper once a week is final. |
 | Matchup points | Your live points in this week's matchup. Attributes: week, matchup ID, and your starters with slot, name and points. |

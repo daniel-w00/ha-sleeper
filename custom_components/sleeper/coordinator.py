@@ -42,6 +42,16 @@ from .const import (
 )
 from .players import SleeperPlayers
 
+
+def league_device_identifier(user_id: str, league_id: str) -> tuple[str, str]:
+    """Return the device registry identifier of a league device.
+
+    League devices are per account: two accounts in the same league get two
+    devices, each linked to its own account device.
+    """
+    return (DOMAIN, f"{user_id}_{league_id}")
+
+
 _LOGGER = logging.getLogger(__name__)
 
 type SleeperConfigEntry = ConfigEntry[SleeperCoordinator]
@@ -360,21 +370,20 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         """
         if not self._leagues:
             return
-        keep = {self.user_id, *(league.league_id for league in self._leagues)}
+        keep = {
+            (DOMAIN, self.user_id),
+            *(
+                league_device_identifier(self.user_id, league.league_id)
+                for league in self._leagues
+            ),
+        }
         device_registry = dr.async_get(self.hass)
         for device in dr.async_entries_for_config_entry(
             device_registry, self.config_entry.entry_id
         ):
-            identifiers = {
-                identifier
-                for domain, identifier in device.identifiers
-                if domain == DOMAIN
-            }
-            if identifiers and not identifiers & keep:
+            if device.identifiers and not device.identifiers & keep:
                 _LOGGER.debug("Removing device of stale league %s", device.name)
-                device_registry.async_update_device(
-                    device.id, remove_config_entry_id=self.config_entry.entry_id
-                )
+                device_registry.async_remove_device(device.id)
 
     async def _async_fetch_league(
         self, league: SleeperLeague, state: SleeperSportState

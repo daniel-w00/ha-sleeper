@@ -29,15 +29,6 @@
       "record": {
         "default": "mdi:scoreboard-outline"
       },
-      "wins": {
-        "default": "mdi:trophy"
-      },
-      "losses": {
-        "default": "mdi:thumb-down-outline"
-      },
-      "ties": {
-        "default": "mdi:equal"
-      },
       "rank": {
         "default": "mdi:podium"
       },

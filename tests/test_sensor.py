@@ -55,8 +55,6 @@ async def test_sensor_values(
         ("sensor.test_user_nfl_season_type", "regular"),
         ("sensor.wombats_league_league_status", "in_season"),
         ("sensor.wombats_league_record", "0-0"),
-        ("sensor.wombats_league_wins", "0"),
-        ("sensor.wombats_league_losses", "0"),
         ("sensor.wombats_league_rank", "1"),
         ("sensor.wombats_league_points_for", "0.0"),
         ("sensor.wombats_league_points_against", "0.0"),
@@ -110,15 +108,14 @@ async def test_sensor_values(
     assert opponent.attributes["opponent_roster_id"] == 5
     assert opponent.attributes["opponent_record"] == "0-0"
 
-    # Pre-draft league: no matchup details, no FAAB entity, ties disabled.
+    # Pre-draft league: no matchup details, no FAAB entity.
     matchup = hass.states.get("sensor.test_league_matchup_points")
     assert matchup is not None
     assert "week" not in matchup.attributes
     assert hass.states.get("sensor.test_league_waiver_budget_remaining") is None
-    ties = entity_registry.async_get("sensor.wombats_league_ties")
-    assert ties is not None
-    assert ties.disabled_by is er.RegistryEntryDisabler.INTEGRATION
-    assert ties.unique_id == f"{TEST_USER_ID}_{LEAGUE_ID}_ties"
+    record = entity_registry.async_get("sensor.wombats_league_record")
+    assert record is not None
+    assert record.unique_id == f"{TEST_USER_ID}_{LEAGUE_ID}_record"
 
 
 async def test_sensors_without_own_roster(

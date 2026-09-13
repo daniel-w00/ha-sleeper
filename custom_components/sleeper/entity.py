@@ -9,7 +9,11 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import SleeperCoordinator, SleeperLeagueData
+from .coordinator import (
+    SleeperCoordinator,
+    SleeperLeagueData,
+    league_device_identifier,
+)
 
 
 class SleeperEntity(CoordinatorEntity[SleeperCoordinator]):
@@ -33,10 +37,9 @@ class SleeperEntity(CoordinatorEntity[SleeperCoordinator]):
 
 
 class SleeperLeagueEntity(SleeperEntity):
-    """Base class for entities that belong to one league.
+    """Base class for entities that belong to one league of one account.
 
-    Each league gets its own device, linked to the account's device. The
-    entity becomes unavailable when the league is no longer in the
+    The entity becomes unavailable when the league is no longer in the
     coordinator data, e.g. after the account left it.
     """
 
@@ -48,7 +51,7 @@ class SleeperLeagueEntity(SleeperEntity):
         self.league_id = league_id
         league = coordinator.data.leagues[league_id].league
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, league_id)},
+            identifiers={league_device_identifier(coordinator.user_id, league_id)},
             entry_type=DeviceEntryType.SERVICE,
             manufacturer="Sleeper",
             name=league.name,

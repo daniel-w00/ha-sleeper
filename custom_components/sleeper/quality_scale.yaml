@@ -80,8 +80,8 @@ rules:
     status: done
     comment: Enum device class where it fits; there is no device class for fantasy points.
   entity-disabled-by-default:
-    status: done
-    comment: The ties sensor is disabled by default.
+    status: todo
+    comment: No secondary entities yet; revisit when phase 2 adds them.
   entity-translations: done
   exception-translations: todo
   icon-translations: done

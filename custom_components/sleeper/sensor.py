@@ -157,22 +157,6 @@ LEAGUE_SENSORS: tuple[SleeperLeagueSensorEntityDescription, ...] = (
         ),
     ),
     SleeperLeagueSensorEntityDescription(
-        key="wins",
-        translation_key="wins",
-        value_fn=_roster_value(lambda roster: roster.wins),
-    ),
-    SleeperLeagueSensorEntityDescription(
-        key="losses",
-        translation_key="losses",
-        value_fn=_roster_value(lambda roster: roster.losses),
-    ),
-    SleeperLeagueSensorEntityDescription(
-        key="ties",
-        translation_key="ties",
-        entity_registry_enabled_default=False,
-        value_fn=_roster_value(lambda roster: roster.ties),
-    ),
-    SleeperLeagueSensorEntityDescription(
         key="rank",
         translation_key="rank",
         value_fn=lambda data: data.rank,

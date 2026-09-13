@@ -6,13 +6,14 @@ from unittest.mock import MagicMock
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.const import STATE_UNAVAILABLE
+from homeassistant.const import CONF_USERNAME, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.sleeper.api import SleeperConnectionError, SleeperLeague
 from custom_components.sleeper.const import DOMAIN, LEAGUE_REFRESH_INTERVAL
+from custom_components.sleeper.coordinator import league_device_identifier
 
 from .conftest import LEAGUE_ID, PREDRAFT_LEAGUE_ID, TEST_USER_ID, async_poll
 
@@ -57,7 +58,8 @@ async def test_devices(
     assert account.entry_type is dr.DeviceEntryType.SERVICE
 
     league = device_registry.async_get_device_by_identifier(
-        (DOMAIN, LEAGUE_ID), config_entry_id=init_integration.entry_id
+        league_device_identifier(TEST_USER_ID, LEAGUE_ID),
+        config_entry_id=init_integration.entry_id,
     )
     assert league is not None
     assert league.name == "Wombats League"
@@ -65,9 +67,11 @@ async def test_devices(
     assert league.manufacturer == "Sleeper"
     assert league.via_device_id == account.id
     assert league.configuration_url == f"https://sleeper.com/leagues/{LEAGUE_ID}"
+    assert league.identifiers == {(DOMAIN, f"{TEST_USER_ID}_{LEAGUE_ID}")}
 
     predraft = device_registry.async_get_device_by_identifier(
-        (DOMAIN, PREDRAFT_LEAGUE_ID), config_entry_id=init_integration.entry_id
+        league_device_identifier(TEST_USER_ID, PREDRAFT_LEAGUE_ID),
+        config_entry_id=init_integration.entry_id,
     )
     assert predraft is not None
     assert predraft.model == "4-team NFL league"
@@ -91,7 +95,8 @@ async def test_league_removed_and_rejoined(
     await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
     assert (
         device_registry.async_get_device_by_identifier(
-            (DOMAIN, PREDRAFT_LEAGUE_ID), config_entry_id=init_integration.entry_id
+            league_device_identifier(TEST_USER_ID, PREDRAFT_LEAGUE_ID),
+            config_entry_id=init_integration.entry_id,
         )
         is not None
     )
@@ -104,7 +109,8 @@ async def test_league_removed_and_rejoined(
     await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
     assert (
         device_registry.async_get_device_by_identifier(
-            (DOMAIN, PREDRAFT_LEAGUE_ID), config_entry_id=init_integration.entry_id
+            league_device_identifier(TEST_USER_ID, PREDRAFT_LEAGUE_ID),
+            config_entry_id=init_integration.entry_id,
         )
         is None
     )
@@ -121,7 +127,48 @@ async def test_league_removed_and_rejoined(
     assert entity_registry.async_get(entity_id) is not None
     assert (
         device_registry.async_get_device_by_identifier(
-            (DOMAIN, PREDRAFT_LEAGUE_ID), config_entry_id=init_integration.entry_id
+            league_device_identifier(TEST_USER_ID, PREDRAFT_LEAGUE_ID),
+            config_entry_id=init_integration.entry_id,
         )
         is not None
     )
+
+
+async def test_two_accounts_in_one_league(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    device_registry: dr.DeviceRegistry,
+) -> None:
+    """Test a second account in the same league gets its own league device."""
+    second = MockConfigEntry(
+        domain=DOMAIN,
+        title="Other",
+        unique_id="987654321",
+        data={CONF_USERNAME: "other"},
+    )
+    second.add_to_hass(hass)
+    await hass.config_entries.async_setup(second.entry_id)
+    await hass.async_block_till_done()
+    assert second.state is ConfigEntryState.LOADED
+
+    first_device = device_registry.async_get_device_by_identifier(
+        league_device_identifier(TEST_USER_ID, LEAGUE_ID),
+        config_entry_id=init_integration.entry_id,
+    )
+    second_device = device_registry.async_get_device_by_identifier(
+        league_device_identifier("987654321", LEAGUE_ID),
+        config_entry_id=second.entry_id,
+    )
+    assert first_device is not None
+    assert second_device is not None
+    assert first_device.id != second_device.id
+    assert first_device.name == second_device.name == "Wombats League"
+    second_account = device_registry.async_get_device_by_identifier(
+        (DOMAIN, "987654321"), config_entry_id=second.entry_id
+    )
+    assert second_account is not None
+    assert second_device.via_device_id == second_account.id
+    assert first_device.config_entries == {init_integration.entry_id}
+    assert second_device.config_entries == {second.entry_id}
+    # Entities of the second account are separate as well.
+    assert hass.states.get("sensor.wombats_league_rank_2") is not None

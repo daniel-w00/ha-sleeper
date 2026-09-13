@@ -142,15 +142,6 @@
           }
         }
       },
-      "wins": {
-        "name": "Wins"
-      },
-      "losses": {
-        "name": "Losses"
-      },
-      "ties": {
-        "name": "Ties"
-      },
       "rank": {
         "name": "Rank"
       },

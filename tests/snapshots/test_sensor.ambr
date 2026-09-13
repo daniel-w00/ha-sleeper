@@ -68,56 +68,6 @@
     'state': 'pre_draft',
   })
 # ---
-# name: test_sensors[sensor.test_league_losses-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'sensor',
-    'entity_category': None,
-    'entity_id': 'sensor.test_league_losses',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Losses',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Losses',
-    'platform': 'sleeper',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'losses',
-    'unique_id': '123456789_1397743357073084416_losses',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_sensors[sensor.test_league_losses-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test League Losses',
-    }),
-    'context': <ANY>,
-    'entity_id': 'sensor.test_league_losses',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': '0',
-  })
-# ---
 # name: test_sensors[sensor.test_league_matchup_points-entry]
   EntityRegistryEntrySnapshot({
     'aliases': list([
@@ -601,56 +551,6 @@
     'state': '10',
   })
 # ---
-# name: test_sensors[sensor.test_league_ties-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'sensor',
-    'entity_category': None,
-    'entity_id': 'sensor.test_league_ties',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Ties',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Ties',
-    'platform': 'sleeper',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'ties',
-    'unique_id': '123456789_1397743357073084416_ties',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_sensors[sensor.test_league_ties-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test League Ties',
-    }),
-    'context': <ANY>,
-    'entity_id': 'sensor.test_league_ties',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': '0',
-  })
-# ---
 # name: test_sensors[sensor.test_league_waiver_position-entry]
   EntityRegistryEntrySnapshot({
     'aliases': list([
@@ -699,56 +599,6 @@
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': '4',
-  })
-# ---
-# name: test_sensors[sensor.test_league_wins-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'sensor',
-    'entity_category': None,
-    'entity_id': 'sensor.test_league_wins',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Wins',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Wins',
-    'platform': 'sleeper',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'wins',
-    'unique_id': '123456789_1397743357073084416_wins',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_sensors[sensor.test_league_wins-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test League Wins',
-    }),
-    'context': <ANY>,
-    'entity_id': 'sensor.test_league_wins',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': '0',
   })
 # ---
 # name: test_sensors[sensor.test_user_nfl_season-entry]
@@ -982,56 +832,6 @@
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': 'in_season',
-  })
-# ---
-# name: test_sensors[sensor.wombats_league_losses-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'sensor',
-    'entity_category': None,
-    'entity_id': 'sensor.wombats_league_losses',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Losses',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Losses',
-    'platform': 'sleeper',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'losses',
-    'unique_id': '123456789_1392910061486997504_losses',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_sensors[sensor.wombats_league_losses-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Wombats League Losses',
-    }),
-    'context': <ANY>,
-    'entity_id': 'sensor.wombats_league_losses',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': '0',
   })
 # ---
 # name: test_sensors[sensor.wombats_league_matchup_points-entry]
@@ -1537,56 +1337,6 @@
     'state': '2',
   })
 # ---
-# name: test_sensors[sensor.wombats_league_ties-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'sensor',
-    'entity_category': None,
-    'entity_id': 'sensor.wombats_league_ties',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Ties',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Ties',
-    'platform': 'sleeper',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'ties',
-    'unique_id': '123456789_1392910061486997504_ties',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_sensors[sensor.wombats_league_ties-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Wombats League Ties',
-    }),
-    'context': <ANY>,
-    'entity_id': 'sensor.wombats_league_ties',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': '0',
-  })
-# ---
 # name: test_sensors[sensor.wombats_league_waiver_budget_remaining-entry]
   EntityRegistryEntrySnapshot({
     'aliases': list([
@@ -1687,55 +1437,5 @@
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': '6',
-  })
-# ---
-# name: test_sensors[sensor.wombats_league_wins-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': list([
-      None,
-    ]),
-    'area_id': None,
-    'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
-    'device_class': None,
-    'device_id': <ANY>,
-    'disabled_by': None,
-    'domain': 'sensor',
-    'entity_category': None,
-    'entity_id': 'sensor.wombats_league_wins',
-    'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Wins',
-    'options': dict({
-    }),
-    'original_device_class': None,
-    'original_icon': None,
-    'original_name': 'Wins',
-    'platform': 'sleeper',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
-    'translation_key': 'wins',
-    'unique_id': '123456789_1392910061486997504_wins',
-    'unit_of_measurement': None,
-  })
-# ---
-# name: test_sensors[sensor.wombats_league_wins-state]
-  StateSnapshot({
-    'attributes': ReadOnlyDict({
-      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Wombats League Wins',
-    }),
-    'context': <ANY>,
-    'entity_id': 'sensor.wombats_league_wins',
-    'last_changed': <ANY>,
-    'last_reported': <ANY>,
-    'last_updated': <ANY>,
-    'state': '0',
   })
 # ---
