@@ -13,11 +13,22 @@ from homeassistant.core import HomeAssistant
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.sleeper.api import SleeperSportState, SleeperUser
+from custom_components.sleeper.api import (
+    SleeperLeague,
+    SleeperLeagueUser,
+    SleeperMatchup,
+    SleeperRoster,
+    SleeperSportState,
+    SleeperUser,
+)
 from custom_components.sleeper.const import DOMAIN
 
 TEST_USERNAME = "testuser"
 TEST_USER_ID = "123456789"
+# The two leagues in the fixtures: a 12-team FAAB league in season and a
+# 4-team league that has not drafted yet.
+LEAGUE_ID = "1392910061486997504"
+PREDRAFT_LEAGUE_ID = "1397743357073084416"
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -25,6 +36,21 @@ FIXTURES = Path(__file__).parent / "fixtures"
 def load_json_fixture(name: str) -> Any:
     """Load a JSON fixture captured from the Sleeper API."""
     return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
+
+
+def rosters_for(league_id: str) -> tuple[SleeperRoster, ...]:
+    """Return the fixture rosters of a league, as the client would."""
+    name = "rosters.json" if league_id == LEAGUE_ID else "rosters_predraft.json"
+    return tuple(SleeperRoster.from_json(item) for item in load_json_fixture(name))
+
+
+def matchups_for(league_id: str, week: int) -> tuple[SleeperMatchup, ...]:
+    """Return the fixture matchups of a league, as the client would."""
+    if league_id != LEAGUE_ID:
+        return ()
+    return tuple(
+        SleeperMatchup.from_json(item) for item in load_json_fixture("matchups_1.json")
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -50,10 +76,23 @@ def mock_sport_state() -> SleeperSportState:
 
 
 @pytest.fixture
+def mock_leagues() -> tuple[SleeperLeague, ...]:
+    """Return the leagues of the test user as the API would deliver them."""
+    return tuple(
+        SleeperLeague.from_json(item) for item in load_json_fixture("leagues.json")
+    )
+
+
+@pytest.fixture
 def mock_client(
-    mock_user: SleeperUser, mock_sport_state: SleeperSportState
+    mock_user: SleeperUser,
+    mock_sport_state: SleeperSportState,
+    mock_leagues: tuple[SleeperLeague, ...],
 ) -> Generator[MagicMock]:
     """Patch the Sleeper client in the config flow and the coordinator."""
+    league_users = tuple(
+        SleeperLeagueUser.from_json(item) for item in load_json_fixture("users.json")
+    )
     with (
         patch(
             "custom_components.sleeper.config_flow.SleeperClient", autospec=True
@@ -66,6 +105,10 @@ def mock_client(
         client = flow_client.return_value
         client.get_user = AsyncMock(return_value=mock_user)
         client.get_sport_state = AsyncMock(return_value=mock_sport_state)
+        client.get_user_leagues = AsyncMock(return_value=mock_leagues)
+        client.get_league_users = AsyncMock(return_value=league_users)
+        client.get_rosters = AsyncMock(side_effect=rosters_for)
+        client.get_matchups = AsyncMock(side_effect=matchups_for)
         yield client
 
 
