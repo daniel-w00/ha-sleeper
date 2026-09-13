@@ -1,11 +1,10 @@
 {
   "name": "ha-sleeper",
-  "image": "mcr.microsoft.com/devcontainers/base:debian",
+  // Prebuilt image with Python 3.14 already compiled in, so the container builds
+  // by download instead of compiling CPython from source. uv and the GitHub CLI
+  // are added as lightweight features on top.
+  "image": "mcr.microsoft.com/devcontainers/python:3-3.14-bookworm",
   "features": {
-    "ghcr.io/devcontainers/features/python:1": {
-      "version": "3.14",
-      "installTools": false
-    },
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/va-h/devcontainers-features/uv:1": {}
   },

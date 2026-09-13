@@ -9,6 +9,9 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-json
+        # devcontainer.json and .vscode/*.json are JSONC (comments allowed);
+        # the strict JSON parser in this hook would reject them.
+        exclude: ^(\.devcontainer/|\.vscode/).*\.json$
       - id: check-yaml
       - id: check-toml
       - id: end-of-file-fixer
