@@ -103,35 +103,50 @@ manager's profile picture; without either, the icon stays. Your browser or the c
 pictures directly from Sleeper's image server. Changed pictures show up with the hourly
 refresh of the league list.
 
-### Big plays: events and the activity feed
+### Big plays: trigger, events and the activity feed
 
 Whenever a starter on either side of your matchup gains or loses **3 or more points** between
 two updates (a field goal, a touchdown, a long play, a fumble or a stat correction), the
-integration fires a `sleeper_player_scored` event. The league device's **Activity** feed and
-the logbook show these as readable lines, for example "Caleb Williams scored 6.3 points
-(24 total, Wombats League)". The **Last big play** sensor keeps the biggest change of the
-latest update that had any, so a dashboard card can show who just scored, with picture.
+integration reports a big play. The league device's **Activity** feed and the logbook show
+these as readable lines, for example "Caleb Williams scored 6.3 points (24 total, Wombats
+League)". The **Last big play** sensor keeps the biggest change of the latest update that had
+any, so a dashboard card can show who just scored, with picture.
 
-The event data contains `player`, `player_id`, `position`, `team`, `picture`, `roster_id`, `is_mine`,
-`previous_points`, `points`, `delta`, `week`, `matchup_id`, `league`, `league_id`,
-`user_id` and `device_id`. To celebrate your own touchdowns:
+#### Trigger: Player scored
+
+In the automation editor, add a trigger, pick **Sleeper** and choose **Player scored**. It has
+two options and an optional target:
+
+- **Whose player**: any, my team or opponent.
+- **Minimum change**: the points gained or lost, at least 3. A change of six or more is
+  usually a touchdown.
+- **Target**: leave empty to trigger for all your leagues, or pick a league device (or one of
+  its entities, its area or a label). Picking the account device covers all its leagues.
+
+The action receives the play as `trigger.player`, `trigger.delta`, `trigger.points`,
+`trigger.is_mine`, `trigger.position`, `trigger.team`, `trigger.picture`, `trigger.league`
+and so on. To celebrate your own touchdowns:
 
 ```yaml
 triggers:
-  - trigger: event
-    event_type: sleeper_player_scored
-    event_data:
-      is_mine: true
-conditions:
-  - condition: template
-    value_template: "{{ trigger.event.data.delta >= 6 }}"
+  - trigger: sleeper.player_scored
+    target:
+      device_id: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
+    options:
+      side: mine
+      min_delta: 6
 actions:
   - action: notify.mobile_app_phone
     data:
-      message: >-
-        {{ trigger.event.data.player }} just scored
-        {{ trigger.event.data.delta }} points!
+      message: "{{ trigger.player }} just scored {{ trigger.delta }} points!"
 ```
+
+#### Event
+
+The trigger is built on the `sleeper_player_scored` event, which you can also use directly,
+for example from Node-RED or an event trigger. Its data contains `player`, `player_id`,
+`position`, `team`, `picture`, `roster_id`, `is_mine`, `previous_points`, `points`, `delta`,
+`week`, `matchup_id`, `league`, `league_id`, `user_id` and `device_id`.
 
 Sleeper updates points about once a minute, so two quick plays by the same player can
 arrive as one change, and a change of six or more points is usually, but not always, a

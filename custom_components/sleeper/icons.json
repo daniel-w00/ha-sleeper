@@ -50,5 +50,10 @@
         "default": "mdi:cash"
       }
     }
+  },
+  "triggers": {
+    "player_scored": {
+      "trigger": "mdi:football"
+    }
   }
 }

@@ -12,6 +12,8 @@ core integration.
     and is turned into frozen dataclasses. Everything else consumes those models only.
   - `coordinator.py` — `DataUpdateCoordinator`, `SleeperData`, `SleeperConfigEntry`.
   - `config_flow.py`, `entity.py`, `sensor.py`, `const.py` — standard core layout.
+  - `trigger.py` + `triggers.yaml` — integration-defined triggers (`Trigger` subclasses,
+    HA 2025.10+ style); `logbook.py` describes the bus events they are built on.
   - `translations/en.json` is what HA loads at runtime; `strings.json` is kept identical.
   - `quality_scale.yaml` — per-rule status. Update it when a rule's status changes.
 - `tests/` — pytest with `pytest-homeassistant-custom-component`. Coverage target: 100%
@@ -76,6 +78,7 @@ core integration.
 | dependency-transparency | `manifest.json` has no requirements; client is in-package |
 | brands | `custom_components/sleeper/brand/` (placeholder icons) |
 | docs-* | `README.md` sections Installation, Configuration, Removal |
-| action-setup, docs-actions, docs-triggers, docs-conditions, entity-event-setup | exempt, see `quality_scale.yaml` |
+| docs-triggers | `README.md` section Big plays, `trigger.py`, `triggers.yaml` |
+| action-setup, docs-actions, docs-conditions, entity-event-setup | exempt, see `quality_scale.yaml` |
 
 Full checklist: https://developers.home-assistant.io/docs/core/integration-quality-scale/checklist

@@ -17,6 +17,7 @@ config:
 api:
 history:
 logbook:
+automation: !include automations.yaml
 recorder:
 sun:
 system_health:

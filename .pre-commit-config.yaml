@@ -13,6 +13,8 @@ repos:
         # the strict JSON parser in this hook would reject them.
         exclude: ^(\.devcontainer/|\.vscode/).*\.json$
       - id: check-yaml
+        # Home Assistant configs use custom tags such as !include.
+        args: [--unsafe]
       - id: check-toml
       - id: end-of-file-fixer
       - id: trailing-whitespace

@@ -74,7 +74,9 @@ ignore = [
 "tests/**" = [
   "S101",    # asserts are fine in tests
   "SLF001",  # private member access is fine in tests
-  "PLR0913",
+  "PLR0913", # pytest fixtures are passed as arguments
+  "PLR0917",
+  "FBT001",  # parametrized booleans are positional by nature
 ]
 
 [tool.ruff.lint.isort]

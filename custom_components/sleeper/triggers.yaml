@@ -1,0 +1,27 @@
+player_scored:
+  target:
+    entity:
+      integration: sleeper
+    device:
+      integration: sleeper
+  fields:
+    side:
+      required: true
+      default: any
+      selector:
+        select:
+          translation_key: side
+          options:
+            - any
+            - mine
+            - opponent
+    min_delta:
+      required: true
+      default: 3
+      selector:
+        number:
+          min: 3
+          max: 100
+          step: 0.1
+          mode: box
+          unit_of_measurement: pts

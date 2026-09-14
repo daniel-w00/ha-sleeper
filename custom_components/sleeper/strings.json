@@ -176,5 +176,30 @@
         }
       }
     }
+  },
+  "selector": {
+    "side": {
+      "options": {
+        "any": "Any",
+        "mine": "My team",
+        "opponent": "Opponent"
+      }
+    }
+  },
+  "triggers": {
+    "player_scored": {
+      "name": "Player scored",
+      "description": "Triggers when a starter on either side of your matchup gains or loses a notable number of points between two updates, for example a touchdown, a field goal or a stat correction.",
+      "fields": {
+        "side": {
+          "name": "Whose player",
+          "description": "Limit the trigger to your own starters or to the opponent's."
+        },
+        "min_delta": {
+          "name": "Minimum change",
+          "description": "Only trigger when the points gained or lost are at least this much. A change of six or more is usually a touchdown."
+        }
+      }
+    }
   }
 }
