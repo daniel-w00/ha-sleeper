@@ -11,8 +11,8 @@ season: get notified when your matchup score changes, show the current week on a
 tablet, or flash the lights when you take the lead.
 
 > **Status:** early development. Standings, live matchup scores with player names, scoring
-> events and waiver information of all your leagues are available; transactions, playoffs
-> and drafts are planned.
+> events, waiver information and slow drafts of all your leagues are available;
+> transactions and playoffs are planned.
 
 ## Prerequisites
 
@@ -83,6 +83,14 @@ These describe the NFL season itself, not the account; they are the same for eve
 | Last big play | The player of the latest big play in your matchup (see below), with the player's picture. Attributes: player ID, position, team, whether the player is yours, previous points, points, change, week. `unknown` until the first big play after a restart. |
 | Waiver position | Your position in the waiver order. |
 | Waiver budget remaining | Only in FAAB leagues. Attributes: budget, used. |
+| Draft start | When the draft is scheduled to start (a timestamp, so "in 3 days" on cards and usable in time triggers). Attributes: draft ID, status (`pre_draft`, `drafting`, `paused`, `complete`), type (snake, linear, auction), rounds, teams, pick timer in seconds, your draft slot. |
+| On the clock | The team whose pick it is, with its picture. Attributes: pick number, round, pick in round, pick as `2.06`, roster ID, whether it is yours, the deadline of the pick, whether the draft is paused, picks made and total. |
+| My next pick | How many picks are made before your next one; `0` while you are on the clock. Attributes: pick number, round, pick in round, pick as `2.06`. |
+| Last pick | The player picked last, with the player's picture. Attributes: pick number, round, pick in round, pick as `2.06`, who picked, roster ID, player ID, position, NFL team, whether it was yours, keeper. |
+
+The draft entities exist for every league with a draft. **On the clock** and **My next pick**
+are `unknown` before the draft, after it, in auction drafts (which have no pick order) and
+when you have no pick left. After the draft they keep showing the final state.
 
 Matchup entities are `unknown` on a bye week, before the draft and outside the regular and
 post season.
@@ -152,6 +160,62 @@ Sleeper updates points about once a minute, so two quick plays by the same playe
 arrive as one change, and a change of six or more points is usually, but not always, a
 touchdown. Bench players and changes below 3 points never fire.
 
+### Drafts: triggers, events and the activity feed
+
+Built for **slow drafts** (pick timers of hours or days). Sleeper's servers cache every
+response for 60 seconds, so in a fast draft with a 60 or 90 second clock the integration
+notices your turn when it is half over. Picks still arrive, just late.
+
+While a draft runs, every pick fires a `sleeper_draft_pick` event and appears in the league
+device's **Activity** feed and the logbook as, for example, "Team 2 picked Jahmyr Gibbs
+(1.07, Wombats League)". Several picks made between two updates are all reported. Whenever
+the pick on the clock moves on, a `sleeper_draft_on_the_clock` event fires; it has no logbook
+line of its own because the **On the clock** sensor's change already shows there.
+
+The pick order follows from the draft type (snake, third round reversal, linear), the draft
+order and traded picks. Auction drafts have no order: they get the pick events and the
+**Last pick** sensor, but nobody is ever "on the clock".
+
+#### Trigger: On the clock
+
+Add a trigger, pick **Sleeper** and choose **On the clock**. By default it fires when it is
+**your** turn; the **Whose pick** option can switch it to other teams or every pick. The
+optional target works like for Player scored. The action receives `trigger.pick` (as
+`2.06`), `trigger.pick_no`, `trigger.round`, `trigger.team`, `trigger.picture`,
+`trigger.deadline`, `trigger.picks_until_mine`, `trigger.is_mine`, `trigger.league` and so on.
+
+```yaml
+triggers:
+  - trigger: sleeper.on_the_clock
+actions:
+  - action: notify.mobile_app_phone
+    data:
+      message: "You are on the clock in {{ trigger.league }} (pick {{ trigger.pick }})!"
+```
+
+#### Trigger: Draft pick made
+
+Fires for every pick; **Whose pick** limits it to your own picks or those of the other
+teams. The action receives `trigger.player`, `trigger.position`, `trigger.team` (the NFL
+team), `trigger.picked_by` (the fantasy team), `trigger.pick`, `trigger.picture`,
+`trigger.is_mine`, `trigger.is_keeper` and so on. The same data is in the
+`sleeper_draft_pick` event.
+
+Reminders before the draft need no trigger of their own: use a time trigger on the **Draft
+start** sensor, for example "1 hour before":
+
+```yaml
+triggers:
+  - trigger: time
+    at:
+      entity_id: sensor.wombats_league_draft_start
+      offset: "-01:00:00"
+```
+
+The pick deadline (in the **On the clock** attributes and the trigger data) is the time of the
+last pick plus the pick timer. It is `unknown` while the draft is paused, during Sleeper's
+overnight autopause and in drafts without a timer.
+
 ### Season rollover
 
 Sleeper creates a new league for every season. When Sleeper switches to the new league
@@ -165,14 +229,24 @@ The integration polls the Sleeper API and adapts the interval to what is happeni
 
 | Situation | Interval |
 |---|---|
-| Matchup points changed within the last 30 minutes (games are on) | 60 seconds |
+| Matchup points changed or a draft pick was made within the last 30 minutes | 60 seconds |
+| A draft is running, nobody has picked for 30 minutes | 5 minutes |
 | Regular or post season, no points changing | 15 minutes |
 | Pre-season and off-season | 60 minutes |
+
+A scheduled draft pulls the next update forward to its start time, and for six hours after
+a scheduled start that the commissioner has not started yet the 5 minute interval applies.
 
 60 seconds is the fastest useful interval: Sleeper's servers cache every response for
 60 seconds. The league list and members are reloaded once an hour. There is no option to
 change the intervals; if you need an update right now, call the `homeassistant.update_entity`
 action on any Sleeper entity.
+
+Each update requests the rosters of every league and the matchups of the leagues in season.
+Draft data is only requested while it can change: a league whose draft has not started
+gets one request per update (to notice the start), a league that is drafting three (the
+draft, its picks and its traded picks), and a league whose draft is finished none at all.
+The finished draft is loaded once after a start of Home Assistant and kept.
 
 Player names, positions and injury statuses come from Sleeper's player list, which is over
 10 MB. It is downloaded once per day at most, shared by all accounts, and kept in Home
@@ -190,7 +264,9 @@ hour later.
   60 seconds until scores stop changing.
 - A win probability like the one in the Sleeper app is not available: Sleeper does not
   publish it.
-- Transactions, playoff brackets and drafts are planned for a later release.
+- Fast drafts (pick clocks of a minute or two) cannot be followed in time because of the
+  60 second cache, see the Drafts section.
+- Transactions and playoff brackets are planned for a later release.
 
 ## Removal
 

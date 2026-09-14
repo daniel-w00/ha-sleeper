@@ -18,6 +18,11 @@ IDLE_OFFSEASON_UPDATE_INTERVAL: Final = timedelta(hours=1)
 LIVE_GRACE_PERIOD: Final = timedelta(minutes=30)
 # How often the league list, league members and the user profile are reloaded.
 LEAGUE_REFRESH_INTERVAL: Final = timedelta(hours=1)
+# While a draft is running and nobody has picked for LIVE_GRACE_PERIOD.
+DRAFT_UPDATE_INTERVAL: Final = timedelta(minutes=5)
+# A scheduled draft is started by the commissioner, often a little late. For
+# this long after the scheduled start the draft interval is used to notice it.
+DRAFT_START_GRACE_PERIOD: Final = timedelta(hours=6)
 
 # Season types in which matchups are played and scored.
 SCORING_SEASON_TYPES: Final = frozenset({"regular", "post"})
@@ -29,6 +34,7 @@ SEASON_TYPES: Final = ("pre", "regular", "post", "off")
 LEAGUE_STATUSES: Final = ("pre_draft", "drafting", "in_season", "complete")
 
 UNIT_POINTS: Final = "pts"
+UNIT_PICKS: Final = "picks"
 
 # Player list: Sleeper asks for at most one download per day.
 PLAYERS_MAX_AGE: Final = timedelta(hours=24)
@@ -47,3 +53,7 @@ EMPTY_SLOT_PLAYER_ID: Final = "0"
 # least NOTABLE_POINTS_DELTA points between two polls.
 EVENT_PLAYER_SCORED: Final = "sleeper_player_scored"
 NOTABLE_POINTS_DELTA: Final = 3.0
+# Bus events fired for every new draft pick and whenever another team (or the
+# account) comes on the clock.
+EVENT_DRAFT_PICK: Final = "sleeper_draft_pick"
+EVENT_DRAFT_ON_THE_CLOCK: Final = "sleeper_draft_on_the_clock"

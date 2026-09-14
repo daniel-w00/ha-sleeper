@@ -17,20 +17,33 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import (
+    DRAFT_STATUS_COMPLETE,
+    DRAFT_STATUS_DRAFTING,
+    DRAFT_STATUS_PAUSED,
+    DRAFT_STATUS_PRE_DRAFT,
+    DRAFT_TYPE_AUCTION,
     SleeperClient,
+    SleeperDraft,
+    SleeperDraftPick,
     SleeperError,
     SleeperLeague,
     SleeperLeagueUser,
     SleeperMatchup,
+    SleeperNotFoundError,
     SleeperPlayer,
     SleeperRoster,
     SleeperSportState,
+    SleeperTradedPick,
     SleeperUser,
 )
 from .const import (
     DEFAULT_SPORT,
     DOMAIN,
+    DRAFT_START_GRACE_PERIOD,
+    DRAFT_UPDATE_INTERVAL,
     EMPTY_SLOT_PLAYER_ID,
+    EVENT_DRAFT_ON_THE_CLOCK,
+    EVENT_DRAFT_PICK,
     EVENT_PLAYER_SCORED,
     IDLE_OFFSEASON_UPDATE_INTERVAL,
     IDLE_SEASON_UPDATE_INTERVAL,
@@ -56,6 +69,9 @@ def league_device_identifier(user_id: str, league_id: str) -> tuple[str, str]:
 
 
 _LOGGER = logging.getLogger(__name__)
+
+# Draft statuses in which picks are being made (or waiting to be made).
+DRAFT_ACTIVE_STATUSES = frozenset({DRAFT_STATUS_DRAFTING, DRAFT_STATUS_PAUSED})
 
 type SleeperConfigEntry = ConfigEntry[SleeperCoordinator]
 
@@ -125,6 +141,28 @@ class SleeperStarter:
 
 
 @dataclass(frozen=True, slots=True)
+class SleeperUpcomingPick:
+    """A draft pick that has not been made yet, and the team that owns it."""
+
+    pick_no: int
+    round: int
+    pick_in_round: int
+    roster_id: int | None
+    user: SleeperLeagueUser | None
+    is_mine: bool
+
+    @property
+    def label(self) -> str:
+        """Return the pick in Sleeper's ``round.pick`` notation, e.g. ``2.06``."""
+        return f"{self.round}.{self.pick_in_round:02d}"
+
+    @property
+    def team_name(self) -> str | None:
+        """Return the name of the team that owns the pick, if known."""
+        return None if self.user is None else self.user.name
+
+
+@dataclass(frozen=True, slots=True)
 class SleeperLeagueData:
     """Everything the entities of one league consume.
 
@@ -143,6 +181,13 @@ class SleeperLeagueData:
     # Notable changes since the last poll, and the biggest one seen so far.
     points_changes: tuple[SleeperPointsChange, ...] = ()
     last_big_play: SleeperPointsChange | None = None
+    # The league's draft; ``None`` if the league has none. Picks are only
+    # loaded once the draft has started, and the new ones since the last
+    # poll are singled out for the events.
+    draft: SleeperDraft | None = None
+    draft_picks: tuple[SleeperDraftPick, ...] = ()
+    traded_picks: tuple[SleeperTradedPick, ...] = ()
+    new_draft_picks: tuple[SleeperDraftPick, ...] = ()
 
     def _starters(self, player_ids: tuple[str, ...]) -> tuple[SleeperStarter, ...]:
         """Resolve a list of starter IDs to slots and players."""
@@ -189,6 +234,150 @@ class SleeperLeagueData:
         return next(
             (user for user in self.users if user.user_id == roster.owner_id), None
         )
+
+    def user_for_roster_id(self, roster_id: int | None) -> SleeperLeagueUser | None:
+        """Return the league member owning the roster with an ID, if any."""
+        roster = next(
+            (roster for roster in self.rosters if roster.roster_id == roster_id), None
+        )
+        return None if roster is None else self.user_for_roster(roster)
+
+    # Draft
+
+    @property
+    def draft_in_progress(self) -> bool:
+        """Return whether the draft has started and is not finished."""
+        return self.draft is not None and self.draft.status in DRAFT_ACTIVE_STATUSES
+
+    @property
+    def last_draft_pick(self) -> SleeperDraftPick | None:
+        """Return the most recent pick of the draft, if any was made."""
+        return max(self.draft_picks, key=lambda pick: pick.pick_no, default=None)
+
+    @property
+    def next_pick_no(self) -> int | None:
+        """Return the number of the pick that is up now.
+
+        ``None`` before the draft, once it is finished, and in auction drafts,
+        which have no pick order.
+        """
+        if (draft := self.draft) is None or not self.draft_in_progress:
+            return None
+        if draft.type == DRAFT_TYPE_AUCTION:
+            return None
+        last = self.last_draft_pick
+        pick_no = 1 if last is None else last.pick_no + 1
+        return pick_no if pick_no <= draft.total_picks else None
+
+    def pick_owner(self, pick_no: int) -> int | None:
+        """Return the roster that owns a pick, taking trades into account.
+
+        The slot's roster comes from the draft's slot map, or from the draft
+        order and the rosters' owners when Sleeper omits the map.
+        """
+        if (draft := self.draft) is None or (slot := draft.slot_of(pick_no)) is None:
+            return None
+        roster_id = draft.slot_to_roster_id.get(slot)
+        if roster_id is None:
+            user_id = next(
+                (
+                    user
+                    for user, user_slot in draft.draft_order.items()
+                    if user_slot == slot
+                ),
+                None,
+            )
+            roster_id = next(
+                (
+                    roster.roster_id
+                    for roster in self.rosters
+                    if user_id is not None and roster.owner_id == user_id
+                ),
+                None,
+            )
+        if roster_id is None:
+            return None
+        round_no = draft.round_of(pick_no)
+        return next(
+            (
+                trade.owner_id
+                for trade in self.traded_picks
+                if trade.round == round_no and trade.roster_id == roster_id
+            ),
+            roster_id,
+        )
+
+    def _upcoming_pick(self, pick_no: int) -> SleeperUpcomingPick:
+        """Describe a pick that is still to be made."""
+        if TYPE_CHECKING:
+            assert self.draft is not None
+        roster_id = self.pick_owner(pick_no)
+        return SleeperUpcomingPick(
+            pick_no=pick_no,
+            round=self.draft.round_of(pick_no),
+            pick_in_round=self.draft.pick_in_round(pick_no),
+            roster_id=roster_id,
+            user=self.user_for_roster_id(roster_id),
+            is_mine=self.my_roster is not None
+            and roster_id == self.my_roster.roster_id,
+        )
+
+    @property
+    def on_the_clock(self) -> SleeperUpcomingPick | None:
+        """Return the pick that is up now and the team that has to make it."""
+        if (pick_no := self.next_pick_no) is None:
+            return None
+        return self._upcoming_pick(pick_no)
+
+    @property
+    def my_next_pick(self) -> SleeperUpcomingPick | None:
+        """Return the account's next pick, ``None`` if it has none left."""
+        if (pick_no := self.next_pick_no) is None or self.my_roster is None:
+            return None
+        if TYPE_CHECKING:
+            assert self.draft is not None
+        return next(
+            (
+                self._upcoming_pick(candidate)
+                for candidate in range(pick_no, self.draft.total_picks + 1)
+                if self.pick_owner(candidate) == self.my_roster.roster_id
+            ),
+            None,
+        )
+
+    @property
+    def picks_until_mine(self) -> int | None:
+        """Return how many picks are made before the account's next one."""
+        if (mine := self.my_next_pick) is None or (
+            pick_no := self.next_pick_no
+        ) is None:
+            return None
+        return mine.pick_no - pick_no
+
+    @property
+    def pick_deadline(self) -> datetime | None:
+        """Return when the current pick's timer runs out.
+
+        Unknown while the draft is paused (by the commissioner or the
+        overnight autopause), without a pick timer, and before the first
+        pick of a draft without a start time.
+        """
+        if (draft := self.draft) is None or self.next_pick_no is None:
+            return None
+        if draft.status != DRAFT_STATUS_DRAFTING or draft.is_autopaused:
+            return None
+        if not draft.pick_timer:
+            return None
+        since = draft.last_picked or draft.start_time
+        return None if since is None else since + draft.pick_timer
+
+    def pick_is_mine(self, pick: SleeperDraftPick) -> bool:
+        """Return whether the account made a pick."""
+        if self.my_roster is None:
+            return False
+        if pick.roster_id is not None:
+            return pick.roster_id == self.my_roster.roster_id
+        return pick.picked_by == self.my_roster.owner_id
 
     @property
     def standings(self) -> tuple[SleeperRoster, ...]:
@@ -332,7 +521,17 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         self._league_season: str | None = None
         self._leagues_refreshed: datetime | None = None
         self._last_points: dict[tuple[str, int], float] = {}
-        self._last_points_change: datetime | None = None
+        # league_id -> draft; draft_id -> its picks and trades
+        self._drafts: dict[str, SleeperDraft] = {}
+        self._draft_picks: dict[str, tuple[SleeperDraftPick, ...]] = {}
+        self._traded_picks: dict[str, tuple[SleeperTradedPick, ...]] = {}
+        # draft_id -> time of the last pick, highest pick number and pick on
+        # the clock as of the last poll
+        self._last_picked: dict[str, datetime | None] = {}
+        self._last_pick_no: dict[str, int] = {}
+        self._last_on_the_clock: dict[str, int | None] = {}
+        # When matchup points or draft picks last changed between two polls.
+        self._last_activity: datetime | None = None
         # (league_id, week, roster_id, player_id) -> points of the last poll
         self._last_player_points: dict[tuple[str, int, int, str], float] = {}
         # league_id -> biggest change of the last poll that had any
@@ -363,8 +562,10 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             assert self._user is not None
         self._update_interval_for(now, state, leagues)
         leagues = self._detect_points_changes(leagues)
+        leagues = self._detect_new_picks(leagues)
         for data in leagues.values():
             self._async_fire_scoring_events(data)
+            self._async_fire_draft_events(data)
         return SleeperData(user=self._user, state=state, leagues=leagues)
 
     def _leagues_need_refresh(self, now: datetime, state: SleeperSportState) -> bool:
@@ -385,6 +586,8 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             league.league_id: await self.client.get_league_users(league.league_id)
             for league in leagues
         }
+        for league in leagues:
+            await self._async_refresh_draft(league)
         self._leagues = leagues
         self._league_season = state.league_season
         self._leagues_refreshed = now
@@ -418,6 +621,71 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
                 _LOGGER.debug("Removing device of stale league %s", device.name)
                 device_registry.async_remove_device(device.id)
 
+    async def _async_refresh_draft(self, league: SleeperLeague) -> None:
+        """Load the draft of a league, its trades and, once complete, its picks.
+
+        A finished draft never changes, so once it is loaded it is kept and
+        not requested again; the picks of a finished draft are fetched once.
+        """
+        cached = self._drafts.pop(league.league_id, None)
+        if league.draft_id is None:
+            return
+        if (
+            cached is not None
+            and cached.draft_id == league.draft_id
+            and cached.status == DRAFT_STATUS_COMPLETE
+        ):
+            self._drafts[league.league_id] = cached
+            return
+        try:
+            draft = await self.client.get_draft(league.draft_id)
+        except SleeperNotFoundError:
+            _LOGGER.debug("League %s has no draft %s", league.name, league.draft_id)
+            return
+        self._drafts[league.league_id] = draft
+        self._traded_picks[draft.draft_id] = await self.client.get_draft_traded_picks(
+            draft.draft_id
+        )
+        if (
+            draft.status == DRAFT_STATUS_COMPLETE
+            and draft.draft_id not in self._draft_picks
+        ):
+            self._draft_picks[draft.draft_id] = await self.client.get_draft_picks(
+                draft.draft_id
+            )
+
+    async def _async_fetch_draft(
+        self, league: SleeperLeague
+    ) -> tuple[
+        SleeperDraft | None,
+        tuple[SleeperDraftPick, ...],
+        tuple[SleeperTradedPick, ...],
+    ]:
+        """Fetch the draft state of a league that is not in season yet.
+
+        Until the draft is complete, the draft object is reloaded every poll
+        to notice when it starts, pauses and finishes. Once it has started,
+        the picks and trades are reloaded too; the poll in which it turns
+        complete fetches the final picks a last time.
+        """
+        if (draft := self._drafts.get(league.league_id)) is None:
+            return None, (), ()
+        if draft.status != DRAFT_STATUS_COMPLETE:
+            draft = await self.client.get_draft(draft.draft_id)
+            self._drafts[league.league_id] = draft
+            if draft.status != DRAFT_STATUS_PRE_DRAFT:
+                self._draft_picks[draft.draft_id] = await self.client.get_draft_picks(
+                    draft.draft_id
+                )
+                self._traded_picks[
+                    draft.draft_id
+                ] = await self.client.get_draft_traded_picks(draft.draft_id)
+        return (
+            draft,
+            self._draft_picks.get(draft.draft_id, ()),
+            self._traded_picks.get(draft.draft_id, ()),
+        )
+
     async def _async_fetch_league(
         self, league: SleeperLeague, state: SleeperSportState
     ) -> SleeperLeagueData:
@@ -429,6 +697,7 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             and state.season_type in SCORING_SEASON_TYPES
         ):
             matchups = await self.client.get_matchups(league.league_id, state.week)
+        draft, draft_picks, traded_picks = await self._async_fetch_draft(league)
         return SleeperLeagueData(
             league=league,
             rosters=rosters,
@@ -440,6 +709,9 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
                 None,
             ),
             player_lookup=self.players.get,
+            draft=draft,
+            draft_picks=draft_picks,
+            traded_picks=traded_picks,
         )
 
     def _detect_points_changes(
@@ -540,37 +812,166 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
                 },
             )
 
+    def _detect_new_picks(
+        self, leagues: dict[str, SleeperLeagueData]
+    ) -> dict[str, SleeperLeagueData]:
+        """Single out the draft picks made since the last poll.
+
+        The first poll that sees a draft only records where it stands, so a
+        restart during a draft does not replay every pick made so far.
+        """
+        result: dict[str, SleeperLeagueData] = {}
+        for league_id, data in leagues.items():
+            if (draft := data.draft) is None:
+                result[league_id] = data
+                continue
+            last = data.last_draft_pick
+            highest = 0 if last is None else last.pick_no
+            previous = self._last_pick_no.get(draft.draft_id)
+            self._last_pick_no[draft.draft_id] = highest
+            new_picks = (
+                ()
+                if previous is None
+                else tuple(pick for pick in data.draft_picks if pick.pick_no > previous)
+            )
+            result[league_id] = replace(data, new_draft_picks=new_picks)
+        return result
+
+    @callback
+    def _async_fire_draft_events(self, data: SleeperLeagueData) -> None:
+        """Fire one event per new draft pick and one when the clock moves on.
+
+        The on-the-clock event fires whenever another pick comes up, for
+        every team, with ``is_mine`` telling whether it is the account's
+        turn. The first poll that sees a draft fires nothing.
+        """
+        if (draft := data.draft) is None:
+            return
+        on_the_clock = data.on_the_clock
+        current = None if on_the_clock is None else on_the_clock.pick_no
+        previous = self._last_on_the_clock.get(draft.draft_id, current)
+        first_sighting = draft.draft_id not in self._last_on_the_clock
+        self._last_on_the_clock[draft.draft_id] = current
+        if first_sighting or (not data.new_draft_picks and current == previous):
+            return
+
+        device = dr.async_get(self.hass).async_get_device_by_identifier(
+            league_device_identifier(self.user_id, data.league.league_id),
+            config_entry_id=self.config_entry.entry_id,
+        )
+        common = {
+            ATTR_DEVICE_ID: device.id if device else None,
+            "user_id": self.user_id,
+            "league_id": data.league.league_id,
+            "league": data.league.name,
+            "draft_id": draft.draft_id,
+        }
+        for pick in data.new_draft_picks:
+            user = data.user_for_roster_id(pick.roster_id)
+            self.hass.bus.async_fire(
+                EVENT_DRAFT_PICK,
+                {
+                    **common,
+                    "pick_no": pick.pick_no,
+                    "round": pick.round,
+                    "pick_in_round": draft.pick_in_round(pick.pick_no),
+                    "pick": f"{pick.round}.{draft.pick_in_round(pick.pick_no):02d}",
+                    "roster_id": pick.roster_id,
+                    "picked_by": None if user is None else user.name,
+                    "picked_by_user_id": pick.picked_by,
+                    "player_id": pick.player_id,
+                    "player": pick.player.name,
+                    "position": pick.player.position,
+                    "team": pick.player.team,
+                    "picture": pick.player.picture_url(self.sport),
+                    "is_mine": data.pick_is_mine(pick),
+                    "is_keeper": pick.is_keeper,
+                },
+            )
+        if on_the_clock is None or current == previous:
+            return
+        deadline = data.pick_deadline
+        self.hass.bus.async_fire(
+            EVENT_DRAFT_ON_THE_CLOCK,
+            {
+                **common,
+                "pick_no": on_the_clock.pick_no,
+                "round": on_the_clock.round,
+                "pick_in_round": on_the_clock.pick_in_round,
+                "pick": on_the_clock.label,
+                "roster_id": on_the_clock.roster_id,
+                "team": on_the_clock.team_name,
+                "picture": (
+                    None if on_the_clock.user is None else on_the_clock.user.avatar_url
+                ),
+                "is_mine": on_the_clock.is_mine,
+                "deadline": None if deadline is None else deadline.isoformat(),
+                "picks_until_mine": data.picks_until_mine,
+            },
+        )
+
     def _update_interval_for(
         self,
         now: datetime,
         state: SleeperSportState,
         leagues: dict[str, SleeperLeagueData],
     ) -> None:
-        """Pick the next update interval from the observed scoring activity."""
+        """Pick the next update interval from the observed activity.
+
+        Changing matchup points or draft picks switch to the live interval.
+        Otherwise a running draft polls at the draft interval, and a draft
+        scheduled to start before the next poll pulls the poll forward.
+        """
         points = {
             (league_id, matchup.roster_id): matchup.points
             for league_id, data in leagues.items()
             for matchup in data.matchups
         }
+        picked = {
+            data.draft.draft_id: data.draft.last_picked
+            for data in leagues.values()
+            if data.draft is not None
+        }
         changed = any(
             self._last_points[key] != value
             for key, value in points.items()
             if key in self._last_points
+        ) or any(
+            self._last_picked[key] != value
+            for key, value in picked.items()
+            if key in self._last_picked
         )
         self._last_points = points
+        self._last_picked = picked
         if changed:
-            self._last_points_change = now
+            self._last_activity = now
 
         interval: timedelta
         if (
-            self._last_points_change is not None
-            and now - self._last_points_change < LIVE_GRACE_PERIOD
+            self._last_activity is not None
+            and now - self._last_activity < LIVE_GRACE_PERIOD
         ):
             interval = LIVE_UPDATE_INTERVAL
+        elif any(data.draft_in_progress for data in leagues.values()):
+            interval = DRAFT_UPDATE_INTERVAL
         elif state.season_type in SCORING_SEASON_TYPES:
             interval = IDLE_SEASON_UPDATE_INTERVAL
         else:
             interval = IDLE_OFFSEASON_UPDATE_INTERVAL
+
+        for data in leagues.values():
+            draft = data.draft
+            if (
+                draft is None
+                or draft.status != DRAFT_STATUS_PRE_DRAFT
+                or draft.start_time is None
+            ):
+                continue
+            until_start = draft.start_time - now
+            if until_start > timedelta(0):
+                interval = min(interval, max(until_start, LIVE_UPDATE_INTERVAL))
+            elif -until_start < DRAFT_START_GRACE_PERIOD:
+                interval = min(interval, DRAFT_UPDATE_INTERVAL)
 
         if interval != self.update_interval:
             _LOGGER.debug("Switching update interval to %s", interval)

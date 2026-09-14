@@ -1,9 +1,11 @@
+.target: &target
+  entity:
+    integration: sleeper
+  device:
+    integration: sleeper
+
 player_scored:
-  target:
-    entity:
-      integration: sleeper
-    device:
-      integration: sleeper
+  target: *target
   fields:
     side:
       required: true
@@ -25,3 +27,31 @@ player_scored:
           step: 0.1
           mode: box
           unit_of_measurement: pts
+
+draft_pick_made:
+  target: *target
+  fields:
+    picker:
+      required: true
+      default: any
+      selector:
+        select:
+          translation_key: picker
+          options:
+            - any
+            - mine
+            - others
+
+on_the_clock:
+  target: *target
+  fields:
+    picker:
+      required: true
+      default: mine
+      selector:
+        select:
+          translation_key: picker
+          options:
+            - any
+            - mine
+            - others

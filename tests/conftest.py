@@ -25,22 +25,28 @@ from pytest_homeassistant_custom_component.syrupy import (
 from syrupy.assertion import SnapshotAssertion
 
 from custom_components.sleeper.api import (
+    SleeperDraft,
+    SleeperDraftPick,
     SleeperLeague,
     SleeperLeagueUser,
     SleeperMatchup,
     SleeperPlayer,
     SleeperRoster,
     SleeperSportState,
+    SleeperTradedPick,
     SleeperUser,
 )
 from custom_components.sleeper.const import DOMAIN
 
 TEST_USERNAME = "testuser"
 TEST_USER_ID = "123456789"
-# The two leagues in the fixtures: a 12-team FAAB league in season and a
-# 4-team league that has not drafted yet.
+# The two leagues in the fixtures: a 12-team FAAB league in season with a
+# complete draft, and a 4-team league whose league list entry still says
+# pre-draft while its slow draft is running (5 of 60 picks made).
 LEAGUE_ID = "1392910061486997504"
 PREDRAFT_LEAGUE_ID = "1397743357073084416"
+DRAFT_ID = "1392910064494333952"
+DRAFTING_DRAFT_ID = "1397743359191212032"
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -80,6 +86,74 @@ def matchups_for(league_id: str, week: int) -> tuple[SleeperMatchup, ...]:
     return tuple(
         SleeperMatchup.from_json(item) for item in load_json_fixture("matchups_1.json")
     )
+
+
+def _draft_fixture(draft_id: str) -> str:
+    """Return the fixture name suffix of a draft."""
+    return "complete" if draft_id == DRAFT_ID else "drafting"
+
+
+def draft_for(draft_id: str) -> SleeperDraft:
+    """Return a fixture draft, as the client would."""
+    return SleeperDraft.from_json(
+        load_json_fixture(f"draft_{_draft_fixture(draft_id)}.json")
+    )
+
+
+def draft_picks_for(draft_id: str) -> tuple[SleeperDraftPick, ...]:
+    """Return the fixture picks of a draft, as the client would."""
+    return tuple(
+        SleeperDraftPick.from_json(item)
+        for item in load_json_fixture(f"draft_picks_{_draft_fixture(draft_id)}.json")
+    )
+
+
+def traded_picks_for(draft_id: str) -> tuple[SleeperTradedPick, ...]:
+    """Return the fixture traded picks of a draft, as the client would."""
+    return tuple(
+        SleeperTradedPick.from_json(item)
+        for item in load_json_fixture(f"traded_picks_{_draft_fixture(draft_id)}.json")
+    )
+
+
+def drafting_picks(count: int) -> tuple[SleeperDraftPick, ...]:
+    """Return the first ``count`` picks of the running test league draft.
+
+    The five fixture picks come first. Further picks are generated along the
+    snake order, the slot map and the traded picks of the draft, with players
+    from the player list fixture, so the account (slot 2, roster 1) is the
+    picker whenever the order says so.
+    """
+    draft = draft_for(DRAFTING_DRAFT_ID)
+    picks = list(draft_picks_for(DRAFTING_DRAFT_ID))[:count]
+    owners = {
+        roster.roster_id: roster.owner_id for roster in rosters_for(PREDRAFT_LEAGUE_ID)
+    }
+    players = list(load_json_fixture("players.json").values())
+    for pick_no in range(len(picks) + 1, count + 1):
+        slot = draft.slot_of(pick_no)
+        assert slot is not None
+        roster_id = draft.slot_to_roster_id[slot]
+        round_no = draft.round_of(pick_no)
+        for trade in traded_picks_for(DRAFTING_DRAFT_ID):
+            if trade.round == round_no and trade.roster_id == roster_id:
+                roster_id = trade.owner_id
+        player = players[pick_no % len(players)]
+        picks.append(
+            SleeperDraftPick.from_json(
+                {
+                    "draft_id": DRAFTING_DRAFT_ID,
+                    "draft_slot": slot,
+                    "pick_no": pick_no,
+                    "round": round_no,
+                    "roster_id": roster_id,
+                    "picked_by": owners[roster_id],
+                    "player_id": player["player_id"],
+                    "metadata": player,
+                }
+            )
+        )
+    return tuple(picks)
 
 
 def matchups_with_points(
@@ -177,6 +251,9 @@ def mock_client(
         client.get_rosters = AsyncMock(side_effect=rosters_for)
         client.get_matchups = AsyncMock(side_effect=matchups_for)
         client.get_players = AsyncMock(return_value=players_fixture())
+        client.get_draft = AsyncMock(side_effect=draft_for)
+        client.get_draft_picks = AsyncMock(side_effect=draft_picks_for)
+        client.get_draft_traded_picks = AsyncMock(side_effect=traded_picks_for)
         yield client
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, override
 
 from homeassistant.components.sensor import (
@@ -17,12 +18,13 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from .api import WAIVER_TYPE_FAAB, SleeperMatchup, SleeperRoster
-from .const import LEAGUE_STATUSES, SEASON_TYPES, UNIT_POINTS
+from .const import LEAGUE_STATUSES, SEASON_TYPES, UNIT_PICKS, UNIT_POINTS
 from .coordinator import (
     SleeperConfigEntry,
     SleeperCoordinator,
     SleeperData,
     SleeperLeagueData,
+    SleeperUpcomingPick,
 )
 from .entity import SleeperEntity, SleeperLeagueEntity
 
@@ -38,7 +40,7 @@ class SleeperSensorEntityDescription(SensorEntityDescription):
 class SleeperLeagueSensorEntityDescription(SensorEntityDescription):
     """Describe a Sleeper sensor that belongs to one league."""
 
-    value_fn: Callable[[SleeperLeagueData], StateType]
+    value_fn: Callable[[SleeperLeagueData], StateType | datetime]
     attributes_fn: Callable[[SleeperLeagueData], dict[str, Any]] | None = None
     entity_picture_fn: Callable[[SleeperLeagueData], str | None] | None = None
     exists_fn: Callable[[SleeperLeagueData], bool] = lambda _: True
@@ -133,6 +135,93 @@ def _last_big_play_picture(data: SleeperLeagueData) -> str | None:
 def _my_picture(data: SleeperLeagueData) -> str | None:
     """Return the picture of the account's team."""
     return None if (user := data.my_user) is None else user.avatar_url
+
+
+def _draft_start_attributes(data: SleeperLeagueData) -> dict[str, Any]:
+    """Return the draft's settings."""
+    if (draft := data.draft) is None:
+        return {}
+    return {
+        "draft_id": draft.draft_id,
+        "status": draft.status,
+        "type": draft.type,
+        "rounds": draft.rounds,
+        "teams": draft.teams,
+        "pick_timer": int(draft.pick_timer.total_seconds()),
+        "my_slot": (
+            None
+            if data.my_roster is None or data.my_roster.owner_id is None
+            else draft.draft_order.get(data.my_roster.owner_id)
+        ),
+    }
+
+
+def _upcoming_pick_attributes(pick: SleeperUpcomingPick) -> dict[str, Any]:
+    """Return the position of a pick that is still to be made."""
+    return {
+        "pick_no": pick.pick_no,
+        "round": pick.round,
+        "pick_in_round": pick.pick_in_round,
+        "pick": pick.label,
+    }
+
+
+def _on_the_clock_attributes(data: SleeperLeagueData) -> dict[str, Any]:
+    """Return the details of the pick that is up and the draft's progress."""
+    if (pick := data.on_the_clock) is None or (draft := data.draft) is None:
+        return {}
+    deadline = data.pick_deadline
+    return {
+        **_upcoming_pick_attributes(pick),
+        "roster_id": pick.roster_id,
+        "is_mine": pick.is_mine,
+        "deadline": None if deadline is None else deadline.isoformat(),
+        "paused": draft.status != "drafting" or draft.is_autopaused,
+        "picks_made": len(data.draft_picks),
+        "picks_total": draft.total_picks,
+    }
+
+
+def _on_the_clock_picture(data: SleeperLeagueData) -> str | None:
+    """Return the picture of the team that is on the clock."""
+    if (pick := data.on_the_clock) is None or pick.user is None:
+        return None
+    return pick.user.avatar_url
+
+
+def _my_next_pick_attributes(data: SleeperLeagueData) -> dict[str, Any]:
+    """Return the position of the account's next pick."""
+    if (pick := data.my_next_pick) is None:
+        return {}
+    return _upcoming_pick_attributes(pick)
+
+
+def _last_pick_attributes(data: SleeperLeagueData) -> dict[str, Any]:
+    """Return the details of the most recent draft pick."""
+    if (pick := data.last_draft_pick) is None or (draft := data.draft) is None:
+        return {}
+    user = data.user_for_roster_id(pick.roster_id)
+    pick_in_round = draft.pick_in_round(pick.pick_no)
+    return {
+        "pick_no": pick.pick_no,
+        "round": pick.round,
+        "pick_in_round": pick_in_round,
+        "pick": f"{pick.round}.{pick_in_round:02d}",
+        "picked_by": None if user is None else user.name,
+        "roster_id": pick.roster_id,
+        "player_id": pick.player_id,
+        "position": pick.player.position,
+        "team": pick.player.team,
+        "is_mine": data.pick_is_mine(pick),
+        "is_keeper": pick.is_keeper,
+    }
+
+
+def _last_pick_picture(data: SleeperLeagueData) -> str | None:
+    """Return the picture of the most recently picked player."""
+    if (pick := data.last_draft_pick) is None:
+        return None
+    return pick.player.picture_url(data.league.sport)
 
 
 def _opponent_picture(data: SleeperLeagueData) -> str | None:
@@ -266,6 +355,42 @@ LEAGUE_SENSORS: tuple[SleeperLeagueSensorEntityDescription, ...] = (
         value_fn=_roster_value(lambda roster: roster.waiver_position),
     ),
     SleeperLeagueSensorEntityDescription(
+        key="draft_start",
+        translation_key="draft_start",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        exists_fn=lambda data: data.draft is not None,
+        value_fn=lambda data: None if data.draft is None else data.draft.start_time,
+        attributes_fn=_draft_start_attributes,
+    ),
+    SleeperLeagueSensorEntityDescription(
+        key="on_the_clock",
+        translation_key="on_the_clock",
+        exists_fn=lambda data: data.draft is not None,
+        value_fn=lambda data: (
+            None if data.on_the_clock is None else data.on_the_clock.team_name
+        ),
+        entity_picture_fn=_on_the_clock_picture,
+        attributes_fn=_on_the_clock_attributes,
+    ),
+    SleeperLeagueSensorEntityDescription(
+        key="my_next_pick",
+        translation_key="my_next_pick",
+        native_unit_of_measurement=UNIT_PICKS,
+        exists_fn=lambda data: data.draft is not None,
+        value_fn=lambda data: data.picks_until_mine,
+        attributes_fn=_my_next_pick_attributes,
+    ),
+    SleeperLeagueSensorEntityDescription(
+        key="last_pick",
+        translation_key="last_pick",
+        exists_fn=lambda data: data.draft is not None,
+        value_fn=lambda data: (
+            None if data.last_draft_pick is None else data.last_draft_pick.player.name
+        ),
+        entity_picture_fn=_last_pick_picture,
+        attributes_fn=_last_pick_attributes,
+    ),
+    SleeperLeagueSensorEntityDescription(
         key="waiver_budget_remaining",
         translation_key="waiver_budget_remaining",
         exists_fn=lambda data: data.league.waiver_type == WAIVER_TYPE_FAAB,
@@ -358,7 +483,7 @@ class SleeperLeagueSensor(SleeperLeagueEntity, SensorEntity):
 
     @property
     @override
-    def native_value(self) -> StateType:
+    def native_value(self) -> StateType | datetime:
         """Return the sensor value."""
         return self.entity_description.value_fn(self.league_data)
 

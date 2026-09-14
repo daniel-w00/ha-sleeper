@@ -48,12 +48,30 @@
       },
       "waiver_budget_remaining": {
         "default": "mdi:cash"
+      },
+      "draft_start": {
+        "default": "mdi:calendar-clock"
+      },
+      "on_the_clock": {
+        "default": "mdi:timer-sand"
+      },
+      "my_next_pick": {
+        "default": "mdi:numeric"
+      },
+      "last_pick": {
+        "default": "mdi:clipboard-list-outline"
       }
     }
   },
   "triggers": {
     "player_scored": {
       "trigger": "mdi:football"
+    },
+    "draft_pick_made": {
+      "trigger": "mdi:clipboard-list-outline"
+    },
+    "on_the_clock": {
+      "trigger": "mdi:timer-sand"
     }
   }
 }

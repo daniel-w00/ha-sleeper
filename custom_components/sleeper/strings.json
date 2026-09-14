@@ -174,6 +174,133 @@
             "name": "Used"
           }
         }
+      },
+      "draft_start": {
+        "name": "Draft start",
+        "state_attributes": {
+          "draft_id": {
+            "name": "Draft ID"
+          },
+          "status": {
+            "name": "Status",
+            "state": {
+              "pre_draft": "Pre-draft",
+              "drafting": "Drafting",
+              "paused": "Paused",
+              "complete": "Complete"
+            }
+          },
+          "type": {
+            "name": "Type",
+            "state": {
+              "snake": "Snake",
+              "linear": "Linear",
+              "auction": "Auction"
+            }
+          },
+          "rounds": {
+            "name": "Rounds"
+          },
+          "teams": {
+            "name": "Teams"
+          },
+          "pick_timer": {
+            "name": "Pick timer"
+          },
+          "my_slot": {
+            "name": "My draft slot"
+          }
+        }
+      },
+      "on_the_clock": {
+        "name": "On the clock",
+        "state_attributes": {
+          "pick_no": {
+            "name": "Pick number"
+          },
+          "round": {
+            "name": "Round"
+          },
+          "pick_in_round": {
+            "name": "Pick in round"
+          },
+          "pick": {
+            "name": "Pick"
+          },
+          "roster_id": {
+            "name": "Roster ID"
+          },
+          "is_mine": {
+            "name": "My pick"
+          },
+          "deadline": {
+            "name": "Deadline"
+          },
+          "paused": {
+            "name": "Paused"
+          },
+          "picks_made": {
+            "name": "Picks made"
+          },
+          "picks_total": {
+            "name": "Picks total"
+          }
+        }
+      },
+      "my_next_pick": {
+        "name": "My next pick",
+        "state_attributes": {
+          "pick_no": {
+            "name": "Pick number"
+          },
+          "round": {
+            "name": "Round"
+          },
+          "pick_in_round": {
+            "name": "Pick in round"
+          },
+          "pick": {
+            "name": "Pick"
+          }
+        }
+      },
+      "last_pick": {
+        "name": "Last pick",
+        "state_attributes": {
+          "pick_no": {
+            "name": "Pick number"
+          },
+          "round": {
+            "name": "Round"
+          },
+          "pick_in_round": {
+            "name": "Pick in round"
+          },
+          "pick": {
+            "name": "Pick"
+          },
+          "picked_by": {
+            "name": "Picked by"
+          },
+          "roster_id": {
+            "name": "Roster ID"
+          },
+          "player_id": {
+            "name": "Player ID"
+          },
+          "position": {
+            "name": "Position"
+          },
+          "team": {
+            "name": "Team"
+          },
+          "is_mine": {
+            "name": "My pick"
+          },
+          "is_keeper": {
+            "name": "Keeper"
+          }
+        }
       }
     }
   },
@@ -183,6 +310,13 @@
         "any": "Any",
         "mine": "My team",
         "opponent": "Opponent"
+      }
+    },
+    "picker": {
+      "options": {
+        "any": "Any",
+        "mine": "My team",
+        "others": "Other teams"
       }
     }
   },
@@ -198,6 +332,26 @@
         "min_delta": {
           "name": "Minimum change",
           "description": "Only trigger when the points gained or lost are at least this much. A change of six or more is usually a touchdown."
+        }
+      }
+    },
+    "draft_pick_made": {
+      "name": "Draft pick made",
+      "description": "Triggers for every pick made in a draft of your leagues, including picks made while Home Assistant was not looking, as soon as they are noticed.",
+      "fields": {
+        "picker": {
+          "name": "Whose pick",
+          "description": "Limit the trigger to your own picks or to those of the other teams."
+        }
+      }
+    },
+    "on_the_clock": {
+      "name": "On the clock",
+      "description": "Triggers when a team comes on the clock in a draft, by default when it is your turn to pick.",
+      "fields": {
+        "picker": {
+          "name": "Whose pick",
+          "description": "Trigger when you are on the clock, when another team is, or for every pick."
         }
       }
     }

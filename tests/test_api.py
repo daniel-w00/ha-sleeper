@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 
 from aiohttp import ClientError
 from homeassistant.core import HomeAssistant
@@ -18,6 +19,8 @@ from custom_components.sleeper.api import (
     WAIVER_TYPE_ROLLING,
     SleeperClient,
     SleeperConnectionError,
+    SleeperDraft,
+    SleeperDraftPick,
     SleeperLeague,
     SleeperLeagueUser,
     SleeperMatchup,
@@ -30,6 +33,7 @@ from .conftest import TEST_USER_ID, load_json_fixture
 
 JSON_HEADERS = {"Content-Type": "application/json"}
 LEAGUE_ID = "1392910061486997504"
+DRAFT_ID = "1392910064494333952"
 
 USER_JSON = {
     "user_id": TEST_USER_ID,
@@ -359,7 +363,7 @@ async def test_get_rosters_predraft(
 
     assert len(rosters) == 4
     assert rosters[0].owner_id == TEST_USER_ID
-    assert rosters[1].owner_id is None
+    assert rosters[1].owner_id == "000000000000000002"
     assert rosters[0].players == ()
     assert rosters[0].starters == ("0",) * 10
 
@@ -535,3 +539,176 @@ def test_player_without_names() -> None:
     assert player.position is None
     assert player.injury_status is None
     assert player.fantasy_positions == ()
+
+
+async def test_get_draft(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test fetching a complete draft."""
+    aioclient_mock.get(
+        f"{BASE_URL}/draft/{DRAFT_ID}", json=load_json_fixture("draft_complete.json")
+    )
+
+    draft = await client.get_draft(DRAFT_ID)
+
+    assert draft.draft_id == DRAFT_ID
+    assert draft.league_id == LEAGUE_ID
+    assert draft.status == "complete"
+    assert draft.type == "snake"
+    assert draft.season == "2026"
+    assert draft.rounds == 14
+    assert draft.teams == 12
+    assert draft.total_picks == 168
+    assert draft.pick_timer == timedelta(hours=8)
+    assert draft.reversal_round == 0
+    assert draft.start_time == datetime(2026, 8, 24, 13, 20, 26, 77000, tzinfo=UTC)
+    assert draft.last_picked == datetime(2026, 9, 7, 19, 59, 31, 535000, tzinfo=UTC)
+    assert draft.draft_order[TEST_USER_ID] == 7
+    assert draft.slot_to_roster_id[7] == 1
+    assert draft.is_autopaused is False
+    # Snake order: the second round runs backwards.
+    assert [draft.slot_of(pick_no) for pick_no in (1, 12, 13, 24, 25)] == [
+        1,
+        12,
+        12,
+        1,
+        1,
+    ]
+    assert draft.round_of(25) == 3
+    assert draft.pick_in_round(25) == 1
+
+
+async def test_get_draft_null(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test an unknown draft (Sleeper answers ``null``) raises not found."""
+    aioclient_mock.get(f"{BASE_URL}/draft/0", text="null", headers=JSON_HEADERS)
+
+    with pytest.raises(SleeperNotFoundError):
+        await client.get_draft("0")
+
+
+def _draft(**settings: int | str) -> SleeperDraft:
+    """Build a 4-team draft with the given type and settings."""
+    draft_type = settings.pop("type", "snake")
+    return SleeperDraft.from_json(
+        {
+            "draft_id": "1",
+            "status": "drafting",
+            "type": draft_type,
+            "season": "2026",
+            "settings": {"rounds": 4, "teams": 4, **settings},
+            "metadata": {"is_autopaused": "true"},
+        }
+    )
+
+
+def test_draft_pick_order() -> None:
+    """Test the pick order of the draft types, including a reversal round."""
+    snake = _draft()
+    assert [snake.slot_of(pick_no) for pick_no in range(1, 13)] == [
+        *(1, 2, 3, 4),
+        *(4, 3, 2, 1),
+        *(1, 2, 3, 4),
+    ]
+    # Third round reversal: round 3 runs backwards again, round 4 forwards.
+    reversal = _draft(reversal_round=3)
+    assert [reversal.slot_of(pick_no) for pick_no in range(1, 17)] == [
+        *(1, 2, 3, 4),
+        *(4, 3, 2, 1),
+        *(4, 3, 2, 1),
+        *(1, 2, 3, 4),
+    ]
+    linear = _draft(type="linear")
+    assert [linear.slot_of(pick_no) for pick_no in range(1, 9)] == [1, 2, 3, 4] * 2
+    assert _draft(type="auction").slot_of(1) is None
+    assert _draft(teams=0).slot_of(1) is None
+    assert snake.is_autopaused is True
+    assert snake.start_time is None
+    assert snake.draft_order == {}
+    assert snake.slot_to_roster_id == {}
+
+
+async def test_get_draft_picks(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test fetching the picks of a draft, sorted by pick number."""
+    picks_json = load_json_fixture("draft_picks_complete.json")
+    aioclient_mock.get(
+        f"{BASE_URL}/draft/{DRAFT_ID}/picks", json=list(reversed(picks_json))
+    )
+
+    picks = await client.get_draft_picks(DRAFT_ID)
+
+    assert len(picks) == 168
+    first = picks[0]
+    assert first.draft_id == DRAFT_ID
+    assert first.pick_no == 1
+    assert first.round == 1
+    assert first.draft_slot == 1
+    assert first.roster_id == 12
+    assert first.picked_by == "000000000000000011"
+    assert first.player_id == "9221"
+    assert first.player.name == "Jahmyr Gibbs"
+    assert first.player.position == "RB"
+    assert first.player.team == "DET"
+    assert first.is_keeper is False
+    assert picks[-1].pick_no == 168
+    # A team defense is picked by its abbreviation and gets the team logo.
+    defense = picks[49]
+    assert defense.player_id == "LAR"
+    assert defense.player.name == "Los Angeles Rams"
+    assert defense.player.picture_url("nfl") == (
+        "https://sleepercdn.com/images/team_logos/nfl/lar.png"
+    )
+
+
+async def test_get_draft_picks_empty(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test a draft without picks answers with an empty list."""
+    aioclient_mock.get(f"{BASE_URL}/draft/{DRAFT_ID}/picks", json=[])
+
+    assert await client.get_draft_picks(DRAFT_ID) == ()
+
+
+def test_draft_pick_without_metadata() -> None:
+    """Test a pick without player details and picker falls back to IDs."""
+    pick = SleeperDraftPick.from_json(
+        {
+            "draft_id": "1",
+            "pick_no": 3,
+            "round": 1,
+            "draft_slot": 3,
+            "roster_id": None,
+            "picked_by": "",
+            "player_id": 4866,
+            "metadata": None,
+            "is_keeper": True,
+        }
+    )
+    assert pick.roster_id is None
+    assert pick.picked_by is None
+    assert pick.player_id == "4866"
+    assert pick.player.name == "4866"
+    assert pick.player.position is None
+    assert pick.is_keeper is True
+
+
+async def test_get_draft_traded_picks(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test fetching the traded picks of a draft."""
+    aioclient_mock.get(
+        f"{BASE_URL}/draft/{DRAFT_ID}/traded_picks",
+        json=load_json_fixture("traded_picks_complete.json"),
+    )
+
+    trades = await client.get_draft_traded_picks(DRAFT_ID)
+
+    assert len(trades) == 7
+    assert trades[0].season == "2026"
+    assert trades[0].round == 6
+    assert trades[0].roster_id == 1
+    assert trades[0].owner_id == 11
+    assert trades[0].previous_owner_id == 1

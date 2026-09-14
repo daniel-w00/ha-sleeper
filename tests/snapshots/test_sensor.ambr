@@ -1,4 +1,62 @@
 # serializer version: 1
+# name: test_sensors[sensor.test_league_draft_start-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.test_league_draft_start',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Draft start',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Draft start',
+    'platform': 'sleeper',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'draft_start',
+    'unique_id': '123456789_1397743357073084416_draft_start',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.test_league_draft_start-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      'draft_id': '1397743359191212032',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test League Draft start',
+      'my_slot': 2,
+      'pick_timer': 28800,
+      'rounds': 15,
+      'status': 'drafting',
+      'teams': 4,
+      'type': 'snake',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.test_league_draft_start',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2026-09-05T18:00:00+00:00',
+  })
+# ---
 # name: test_sensors[sensor.test_league_last_big_play-entry]
   EntityRegistryEntrySnapshot({
     'aliases': list([
@@ -47,6 +105,68 @@
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.test_league_last_pick-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.test_league_last_pick',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last pick',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Last pick',
+    'platform': 'sleeper',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_pick',
+    'unique_id': '123456789_1397743357073084416_last_pick',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.test_league_last_pick-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.ENTITY_PICTURE: 'entity_picture'>: 'https://sleepercdn.com/content/nfl/players/thumb/4866.jpg',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test League Last pick',
+      'is_keeper': False,
+      'is_mine': False,
+      'pick': '2.01',
+      'pick_in_round': 1,
+      'pick_no': 5,
+      'picked_by': 'user_4',
+      'player_id': '4866',
+      'position': 'RB',
+      'roster_id': 4,
+      'round': 2,
+      'team': 'PHI',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.test_league_last_pick',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'Saquon Barkley',
   })
 # ---
 # name: test_sensors[sensor.test_league_league_status-entry]
@@ -173,6 +293,121 @@
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.test_league_my_next_pick-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.test_league_my_next_pick',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'My next pick',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'My next pick',
+    'platform': 'sleeper',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'my_next_pick',
+    'unique_id': '123456789_1397743357073084416_my_next_pick',
+    'unit_of_measurement': 'picks',
+  })
+# ---
+# name: test_sensors[sensor.test_league_my_next_pick-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test League My next pick',
+      'pick': '2.03',
+      'pick_in_round': 3,
+      'pick_no': 7,
+      'round': 2,
+      <EntityStateAttribute.UNIT_OF_MEASUREMENT: 'unit_of_measurement'>: 'picks',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.test_league_my_next_pick',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '1',
+  })
+# ---
+# name: test_sensors[sensor.test_league_on_the_clock-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.test_league_on_the_clock',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'On the clock',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'On the clock',
+    'platform': 'sleeper',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'on_the_clock',
+    'unique_id': '123456789_1397743357073084416_on_the_clock',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.test_league_on_the_clock-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'deadline': '2026-09-06T18:00:00+00:00',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test League On the clock',
+      'is_mine': False,
+      'paused': False,
+      'pick': '2.02',
+      'pick_in_round': 2,
+      'pick_no': 6,
+      'picks_made': 5,
+      'picks_total': 60,
+      'roster_id': 3,
+      'round': 2,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.test_league_on_the_clock',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'user_3',
   })
 # ---
 # name: test_sensors[sensor.test_league_opponent-entry]
@@ -866,6 +1101,64 @@
     'state': '1',
   })
 # ---
+# name: test_sensors[sensor.wombats_league_draft_start-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.wombats_league_draft_start',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Draft start',
+    'options': dict({
+    }),
+    'original_device_class': <SensorDeviceClass.TIMESTAMP: 'timestamp'>,
+    'original_icon': None,
+    'original_name': 'Draft start',
+    'platform': 'sleeper',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'draft_start',
+    'unique_id': '123456789_1392910061486997504_draft_start',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.wombats_league_draft_start-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.DEVICE_CLASS: 'device_class'>: 'timestamp',
+      'draft_id': '1392910064494333952',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Wombats League Draft start',
+      'my_slot': 7,
+      'pick_timer': 28800,
+      'rounds': 14,
+      'status': 'complete',
+      'teams': 12,
+      'type': 'snake',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.wombats_league_draft_start',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2026-08-24T13:20:26+00:00',
+  })
+# ---
 # name: test_sensors[sensor.wombats_league_last_big_play-entry]
   EntityRegistryEntrySnapshot({
     'aliases': list([
@@ -914,6 +1207,68 @@
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.wombats_league_last_pick-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.wombats_league_last_pick',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'Last pick',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'Last pick',
+    'platform': 'sleeper',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'last_pick',
+    'unique_id': '123456789_1392910061486997504_last_pick',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.wombats_league_last_pick-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.ENTITY_PICTURE: 'entity_picture'>: 'https://sleepercdn.com/content/nfl/players/thumb/5189.jpg',
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Wombats League Last pick',
+      'is_keeper': False,
+      'is_mine': False,
+      'pick': '14.12',
+      'pick_in_round': 12,
+      'pick_no': 168,
+      'picked_by': 'Team 11',
+      'player_id': '5189',
+      'position': 'K',
+      'roster_id': 12,
+      'round': 14,
+      'team': 'SF',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.wombats_league_last_pick',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'Eddy Pineiro',
   })
 # ---
 # name: test_sensors[sensor.wombats_league_league_status-entry]
@@ -1098,6 +1453,107 @@
     'last_reported': <ANY>,
     'last_updated': <ANY>,
     'state': '71.66',
+  })
+# ---
+# name: test_sensors[sensor.wombats_league_my_next_pick-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.wombats_league_my_next_pick',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'My next pick',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'My next pick',
+    'platform': 'sleeper',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'my_next_pick',
+    'unique_id': '123456789_1392910061486997504_my_next_pick',
+    'unit_of_measurement': 'picks',
+  })
+# ---
+# name: test_sensors[sensor.wombats_league_my_next_pick-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Wombats League My next pick',
+      <EntityStateAttribute.UNIT_OF_MEASUREMENT: 'unit_of_measurement'>: 'picks',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.wombats_league_my_next_pick',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
+  })
+# ---
+# name: test_sensors[sensor.wombats_league_on_the_clock-entry]
+  EntityRegistryEntrySnapshot({
+    'aliases': list([
+      None,
+    ]),
+    'area_id': None,
+    'capabilities': None,
+    'config_entry_id': <ANY>,
+    'config_subentry_id': <ANY>,
+    'device_class': None,
+    'device_id': <ANY>,
+    'disabled_by': None,
+    'domain': 'sensor',
+    'entity_category': None,
+    'entity_id': 'sensor.wombats_league_on_the_clock',
+    'has_entity_name': True,
+    'hidden_by': None,
+    'icon': None,
+    'id': <ANY>,
+    'labels': set({
+    }),
+    'name': None,
+    'object_id_base': 'On the clock',
+    'options': dict({
+    }),
+    'original_device_class': None,
+    'original_icon': None,
+    'original_name': 'On the clock',
+    'platform': 'sleeper',
+    'previous_unique_id': None,
+    'suggested_object_id': None,
+    'supported_features': 0,
+    'translation_key': 'on_the_clock',
+    'unique_id': '123456789_1392910061486997504_on_the_clock',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensors[sensor.wombats_league_on_the_clock-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Wombats League On the clock',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.wombats_league_on_the_clock',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'unknown',
   })
 # ---
 # name: test_sensors[sensor.wombats_league_opponent-entry]

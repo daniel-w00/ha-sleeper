@@ -13,7 +13,7 @@ from homeassistant.components.logbook.const import (
 from homeassistant.components.logbook.models import LazyEventPartialState
 from homeassistant.core import HomeAssistant, callback
 
-from .const import DOMAIN, EVENT_PLAYER_SCORED
+from .const import DOMAIN, EVENT_DRAFT_PICK, EVENT_PLAYER_SCORED
 
 
 @callback
@@ -41,4 +41,23 @@ def async_describe_events(
             LOGBOOK_ENTRY_ICON: "mdi:football",
         }
 
+    @callback
+    def async_describe_draft_pick(event: LazyEventPartialState) -> dict[str, Any]:
+        """Describe a draft pick, e.g. "picked Jahmyr Gibbs (1.07, Wombats League)"."""
+        data = event.data
+        team = data["picked_by"] or (
+            f"Roster {data['roster_id']}"
+            if data["roster_id"] is not None
+            else "Someone"
+        )
+        keeper = " as a keeper" if data["is_keeper"] else ""
+        return {
+            LOGBOOK_ENTRY_NAME: team,
+            LOGBOOK_ENTRY_MESSAGE: (
+                f"picked {data['player']}{keeper} ({data['pick']}, {data['league']})"
+            ),
+            LOGBOOK_ENTRY_ICON: "mdi:clipboard-list-outline",
+        }
+
     async_describe_event(DOMAIN, EVENT_PLAYER_SCORED, async_describe_player_scored)
+    async_describe_event(DOMAIN, EVENT_DRAFT_PICK, async_describe_draft_pick)

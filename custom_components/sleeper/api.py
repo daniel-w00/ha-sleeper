@@ -18,6 +18,14 @@ Observed behaviour that the documentation does not mention:
 - User and league ``avatar`` fields are image IDs on Sleeper's CDN. A team
   picture a manager uploaded for one league is a full URL in the league
   member's ``metadata.avatar``; most managers never set one.
+- A draft does not say whose turn it is. The order of the picks follows from
+  the draft type, the draft order and the traded picks; see
+  :meth:`SleeperDraft.slot_of`.
+- ``slot_to_roster_id`` and ``draft_order`` of a draft are ``null`` until the
+  commissioner sets the order. The league's draft list omits
+  ``slot_to_roster_id``; the single draft endpoint has it.
+- Timestamps (``start_time``, ``last_picked``) are milliseconds since the
+  epoch.
 """
 
 from __future__ import annotations
@@ -25,6 +33,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 import json
 import logging
 from types import MappingProxyType
@@ -50,6 +59,15 @@ PLAYERS_TIMEOUT = 60
 WAIVER_TYPE_ROLLING = 0
 WAIVER_TYPE_REVERSE_STANDINGS = 1
 WAIVER_TYPE_FAAB = 2
+
+# Draft statuses and types.
+DRAFT_STATUS_PRE_DRAFT = "pre_draft"
+DRAFT_STATUS_DRAFTING = "drafting"
+DRAFT_STATUS_PAUSED = "paused"
+DRAFT_STATUS_COMPLETE = "complete"
+DRAFT_TYPE_SNAKE = "snake"
+DRAFT_TYPE_LINEAR = "linear"
+DRAFT_TYPE_AUCTION = "auction"
 
 
 class SleeperError(Exception):
@@ -366,6 +384,159 @@ class SleeperPlayer:
         return f"{self.first_name} {self.last_name}".strip() or self.player_id
 
 
+def _timestamp(value: Any) -> datetime | None:
+    """Convert milliseconds since the epoch to an aware datetime."""
+    return None if value is None else datetime.fromtimestamp(int(value) / 1000, UTC)
+
+
+@dataclass(frozen=True, slots=True)
+class SleeperDraft:
+    """The draft of a league.
+
+    ``draft_order`` maps user IDs to draft slots (1-based) and
+    ``slot_to_roster_id`` maps slots to rosters; both are empty until the
+    commissioner sets the order. ``reversal_round`` is the round from which a
+    snake draft reverses direction ("third round reversal"), 0 for a plain
+    snake.
+    """
+
+    draft_id: str
+    league_id: str | None
+    status: str
+    type: str
+    season: str
+    start_time: datetime | None
+    last_picked: datetime | None
+    rounds: int
+    teams: int
+    pick_timer: timedelta
+    reversal_round: int
+    draft_order: Mapping[str, int]
+    slot_to_roster_id: Mapping[int, int]
+    is_autopaused: bool
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> Self:
+        """Build a draft from an API response object."""
+        settings: dict[str, Any] = data.get("settings") or {}
+        metadata: dict[str, Any] = data.get("metadata") or {}
+        draft_order: dict[str, Any] = data.get("draft_order") or {}
+        slot_to_roster_id: dict[str, Any] = data.get("slot_to_roster_id") or {}
+        return cls(
+            draft_id=str(data["draft_id"]),
+            league_id=_optional_str(data.get("league_id")),
+            status=data["status"],
+            type=data["type"],
+            season=str(data["season"]),
+            start_time=_timestamp(data.get("start_time")),
+            last_picked=_timestamp(data.get("last_picked")),
+            rounds=int(settings.get("rounds", 0)),
+            teams=int(settings.get("teams", 0)),
+            pick_timer=timedelta(seconds=int(settings.get("pick_timer", 0))),
+            reversal_round=int(settings.get("reversal_round", 0)),
+            draft_order=MappingProxyType(
+                {str(key): int(value) for key, value in draft_order.items()}
+            ),
+            slot_to_roster_id=MappingProxyType(
+                {int(key): int(value) for key, value in slot_to_roster_id.items()}
+            ),
+            is_autopaused=str(metadata.get("is_autopaused")).lower() == "true",
+        )
+
+    @property
+    def total_picks(self) -> int:
+        """Return the number of picks in the whole draft."""
+        return self.rounds * self.teams
+
+    def round_of(self, pick_no: int) -> int:
+        """Return the round (1-based) an overall pick number falls in."""
+        return (pick_no - 1) // self.teams + 1
+
+    def pick_in_round(self, pick_no: int) -> int:
+        """Return the position (1-based) of an overall pick number in its round."""
+        return (pick_no - 1) % self.teams + 1
+
+    def slot_of(self, pick_no: int) -> int | None:
+        """Return the draft slot that originally owns an overall pick number.
+
+        Auction drafts have no pick order, so they yield ``None``. In a snake
+        draft even rounds run backwards; from ``reversal_round`` on, the
+        direction of every round is flipped.
+        """
+        if self.type == DRAFT_TYPE_AUCTION or self.teams < 1:
+            return None
+        round_no = self.round_of(pick_no)
+        position = self.pick_in_round(pick_no)
+        forward = True
+        if self.type == DRAFT_TYPE_SNAKE:
+            forward = round_no % 2 == 1
+            if self.reversal_round and round_no >= self.reversal_round:
+                forward = not forward
+        return position if forward else self.teams - position + 1
+
+
+@dataclass(frozen=True, slots=True)
+class SleeperDraftPick:
+    """One pick of a draft.
+
+    The player's details are copied from the pick's metadata, so picks are
+    readable without the player list.
+    """
+
+    draft_id: str
+    pick_no: int
+    round: int
+    draft_slot: int
+    roster_id: int | None
+    picked_by: str | None
+    player_id: str
+    player: SleeperPlayer
+    is_keeper: bool
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> Self:
+        """Build a pick from an API response object."""
+        player_id = str(data["player_id"])
+        metadata: dict[str, Any] = data.get("metadata") or {}
+        return cls(
+            draft_id=str(data["draft_id"]),
+            pick_no=int(data["pick_no"]),
+            round=int(data["round"]),
+            draft_slot=int(data["draft_slot"]),
+            roster_id=_optional_int(data.get("roster_id")),
+            picked_by=_optional_str(data.get("picked_by")) or None,
+            player_id=player_id,
+            player=SleeperPlayer.from_json({**metadata, "player_id": player_id}),
+            is_keeper=bool(data.get("is_keeper")),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class SleeperTradedPick:
+    """A draft pick owned by another roster than the one it started with.
+
+    ``roster_id`` is the original owner (the roster in that draft slot),
+    ``owner_id`` the roster that owns the pick now.
+    """
+
+    season: str
+    round: int
+    roster_id: int
+    owner_id: int
+    previous_owner_id: int | None
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> Self:
+        """Build a traded pick from an API response object."""
+        return cls(
+            season=str(data["season"]),
+            round=int(data["round"]),
+            roster_id=int(data["roster_id"]),
+            owner_id=int(data["owner_id"]),
+            previous_owner_id=_optional_int(data.get("previous_owner_id")),
+        )
+
+
 def _parse_players(text: str) -> dict[str, SleeperPlayer]:
     """Decode the player list. CPU heavy, meant to run in an executor."""
     data: dict[str, dict[str, Any]] = json.loads(text) or {}
@@ -526,3 +697,25 @@ class SleeperClient:
         """
         data = await self._get_list(f"league/{league_id}/matchups/{week}")
         return tuple(SleeperMatchup.from_json(item) for item in data)
+
+    async def get_draft(self, draft_id: str) -> SleeperDraft:
+        """Fetch a single draft."""
+        data = await self._get_object(f"draft/{draft_id}", f"Draft {draft_id!r}")
+        return SleeperDraft.from_json(data)
+
+    async def get_draft_picks(self, draft_id: str) -> tuple[SleeperDraftPick, ...]:
+        """Fetch the picks made so far in a draft, in pick order."""
+        data = await self._get_list(f"draft/{draft_id}/picks")
+        return tuple(
+            sorted(
+                (SleeperDraftPick.from_json(item) for item in data),
+                key=lambda pick: pick.pick_no,
+            )
+        )
+
+    async def get_draft_traded_picks(
+        self, draft_id: str
+    ) -> tuple[SleeperTradedPick, ...]:
+        """Fetch the traded picks of a draft."""
+        data = await self._get_list(f"draft/{draft_id}/traded_picks")
+        return tuple(SleeperTradedPick.from_json(item) for item in data)
