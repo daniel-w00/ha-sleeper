@@ -15,6 +15,9 @@ Observed behaviour that the documentation does not mention:
 - A roster on a bye week has ``matchup_id: null`` in the matchups list.
 - Roster records and season points only update once a week is finalised;
   the live points of the running week are in the matchups.
+- User and league ``avatar`` fields are image IDs on Sleeper's CDN. A team
+  picture a manager uploaded for one league is a full URL in the league
+  member's ``metadata.avatar``; most managers never set one.
 """
 
 from __future__ import annotations
@@ -32,6 +35,7 @@ from aiohttp import ClientError, ClientResponseError, ClientSession
 _LOGGER = logging.getLogger(__name__)
 
 BASE_URL = "https://api.sleeper.app/v1"
+AVATAR_URL = "https://sleepercdn.com/avatars"
 DEFAULT_TIMEOUT = 10
 # The player list is >10 MB; give slow connections a chance.
 PLAYERS_TIMEOUT = 60
@@ -157,6 +161,11 @@ class SleeperLeague:
             avatar=data.get("avatar"),
         )
 
+    @property
+    def avatar_url(self) -> str | None:
+        """Return the URL of the league's picture, if it has one."""
+        return _avatar_url(self.avatar)
+
 
 @dataclass(frozen=True, slots=True)
 class SleeperRoster:
@@ -217,6 +226,7 @@ class SleeperLeagueUser:
     display_name: str
     avatar: str | None
     team_name: str | None
+    team_avatar: str | None
     is_owner: bool
 
     @classmethod
@@ -224,11 +234,18 @@ class SleeperLeagueUser:
         """Build a league member from an API response object."""
         metadata: dict[str, Any] = data.get("metadata") or {}
         team_name = metadata.get("team_name")
+        team_avatar = metadata.get("avatar")
         return cls(
             user_id=str(data["user_id"]),
             display_name=data["display_name"],
             avatar=data.get("avatar"),
             team_name=team_name.strip() if team_name else None,
+            # Other managers control this value; only accept a web image URL.
+            team_avatar=(
+                team_avatar
+                if isinstance(team_avatar, str) and team_avatar.startswith("https://")
+                else None
+            ),
             is_owner=bool(data.get("is_owner")),
         )
 
@@ -236,6 +253,11 @@ class SleeperLeagueUser:
     def name(self) -> str:
         """Return the team name if set, otherwise the display name."""
         return self.team_name or self.display_name
+
+    @property
+    def avatar_url(self) -> str | None:
+        """Return the team picture if set, otherwise the user's avatar."""
+        return self.team_avatar or _avatar_url(self.avatar)
 
 
 @dataclass(frozen=True, slots=True)
@@ -332,6 +354,11 @@ def _parse_players(text: str) -> dict[str, SleeperPlayer]:
     return {
         player_id: SleeperPlayer.from_json(item) for player_id, item in data.items()
     }
+
+
+def _avatar_url(avatar_id: str | None) -> str | None:
+    """Return the thumbnail URL (80x80) of an avatar ID, if there is one."""
+    return f"{AVATAR_URL}/thumbs/{avatar_id}" if avatar_id else None
 
 
 def _optional_str(value: Any) -> str | None:

@@ -78,6 +78,10 @@ async def test_data(
     assert wombats.opponent_roster.roster_id == 5
     # The opponent has not set a team name, so the display name is used.
     assert wombats.opponent_name == "user_12"
+    assert wombats.my_user is not None
+    assert wombats.my_user.user_id == TEST_USER_ID
+    assert wombats.opponent_user is not None
+    assert wombats.opponent_user.user_id == "000000000000000012"
 
     predraft = data.leagues[PREDRAFT_LEAGUE_ID]
     assert predraft.league.status == "pre_draft"
@@ -164,6 +168,9 @@ def test_no_roster_in_league() -> None:
     assert data.opponent_matchup is None
     assert data.opponent_roster is None
     assert data.opponent_name is None
+    assert data.my_user is None
+    assert data.my_team_name is None
+    assert data.opponent_user is None
 
 
 def test_bye_week() -> None:
@@ -190,6 +197,8 @@ def test_opponent_without_owner() -> None:
     data = _league_data((_roster(1, "a"), _roster(2, None)), matchups, users)
     assert data.opponent_roster is not None
     assert data.opponent_name is None
+    assert data.opponent_user is None
+    assert data.my_user is not None
 
     # Opponent roster is owned by a user missing from the member list.
     data = _league_data((_roster(1, "a"), _roster(2, "ghost")), matchups, users)

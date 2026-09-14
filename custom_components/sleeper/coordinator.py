@@ -250,11 +250,30 @@ class SleeperLeagueData:
         )
 
     @property
-    def opponent_name(self) -> str | None:
-        """Return the opponent's team name, ``None`` for an unowned roster."""
+    def my_user(self) -> SleeperLeagueUser | None:
+        """Return the league member entry of the account's roster."""
+        if self.my_roster is None:
+            return None
+        return self.user_for_roster(self.my_roster)
+
+    @property
+    def my_team_name(self) -> str | None:
+        """Return the account's team name, ``None`` without a roster."""
+        if (user := self.my_user) is None:
+            return None
+        return user.name
+
+    @property
+    def opponent_user(self) -> SleeperLeagueUser | None:
+        """Return the league member the account plays against this week."""
         if (roster := self.opponent_roster) is None:
             return None
-        if (user := self.user_for_roster(roster)) is None:
+        return self.user_for_roster(roster)
+
+    @property
+    def opponent_name(self) -> str | None:
+        """Return the opponent's team name, ``None`` for an unowned roster."""
+        if (user := self.opponent_user) is None:
             return None
         return user.name
 

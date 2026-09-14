@@ -21,6 +21,9 @@
       "league_status": {
         "default": "mdi:trophy-outline"
       },
+      "team": {
+        "default": "mdi:account-group"
+      },
       "record": {
         "default": "mdi:scoreboard-outline"
       },

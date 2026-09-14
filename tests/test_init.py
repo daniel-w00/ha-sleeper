@@ -103,6 +103,11 @@ async def test_league_removed_and_rejoined(
     state = hass.states.get(entity_id)
     assert state is not None
     assert state.state == STATE_UNAVAILABLE
+    # Pictures are read for unavailable entities too; they must not fail.
+    state = hass.states.get("sensor.test_league_team")
+    assert state is not None
+    assert state.state == STATE_UNAVAILABLE
+    assert "entity_picture" not in state.attributes
 
     # The account left the pre-draft league.
     mock_client.get_user_leagues.return_value = mock_leagues[1:]

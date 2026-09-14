@@ -1,6 +1,6 @@
 [
   {
-    "avatar": null,
+    "avatar": "opponentavatar",
     "display_name": "user_12",
     "is_bot": false,
     "is_owner": null,
@@ -16,6 +16,7 @@
     "is_owner": true,
     "league_id": "1392910061486997504",
     "metadata": {
+      "avatar": "https://sleepercdn.com/uploads/testteam.jpg",
       "team_name": "Test Team"
     },
     "settings": null,

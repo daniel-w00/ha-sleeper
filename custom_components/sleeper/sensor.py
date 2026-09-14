@@ -40,6 +40,7 @@ class SleeperLeagueSensorEntityDescription(SensorEntityDescription):
 
     value_fn: Callable[[SleeperLeagueData], StateType]
     attributes_fn: Callable[[SleeperLeagueData], dict[str, Any]] | None = None
+    entity_picture_fn: Callable[[SleeperLeagueData], str | None] | None = None
     exists_fn: Callable[[SleeperLeagueData], bool] = lambda _: True
 
 
@@ -107,6 +108,16 @@ def _waiver_budget_attributes(data: SleeperLeagueData) -> dict[str, Any]:
     }
 
 
+def _my_picture(data: SleeperLeagueData) -> str | None:
+    """Return the picture of the account's team."""
+    return None if (user := data.my_user) is None else user.avatar_url
+
+
+def _opponent_picture(data: SleeperLeagueData) -> str | None:
+    """Return the picture of the week's opponent."""
+    return None if (user := data.opponent_user) is None else user.avatar_url
+
+
 SENSORS: tuple[SleeperSensorEntityDescription, ...] = (
     SleeperSensorEntityDescription(
         key="week",
@@ -141,6 +152,12 @@ LEAGUE_SENSORS: tuple[SleeperLeagueSensorEntityDescription, ...] = (
             "playoff_teams": data.league.playoff_teams,
             "scoring_type": data.league.scoring_type,
         },
+    ),
+    SleeperLeagueSensorEntityDescription(
+        key="team",
+        translation_key="team",
+        value_fn=lambda data: data.my_team_name,
+        entity_picture_fn=_my_picture,
     ),
     SleeperLeagueSensorEntityDescription(
         key="record",
@@ -203,11 +220,13 @@ LEAGUE_SENSORS: tuple[SleeperLeagueSensorEntityDescription, ...] = (
         value_fn=lambda data: (
             None if data.opponent_matchup is None else data.opponent_matchup.points
         ),
+        entity_picture_fn=_opponent_picture,
     ),
     SleeperLeagueSensorEntityDescription(
         key="opponent",
         translation_key="opponent",
         value_fn=lambda data: data.opponent_name,
+        entity_picture_fn=_opponent_picture,
         attributes_fn=_opponent_attributes,
     ),
     SleeperLeagueSensorEntityDescription(
@@ -311,6 +330,16 @@ class SleeperLeagueSensor(SleeperLeagueEntity, SensorEntity):
     def native_value(self) -> StateType:
         """Return the sensor value."""
         return self.entity_description.value_fn(self.league_data)
+
+    @property
+    @override
+    def entity_picture(self) -> str | None:
+        """Return the league or team picture shown instead of the icon."""
+        # Home Assistant also reads the picture of unavailable entities, whose
+        # league may be gone from the coordinator data.
+        if self.entity_description.entity_picture_fn is None or not self.available:
+            return None
+        return self.entity_description.entity_picture_fn(self.league_data)
 
     @property
     @override

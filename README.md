@@ -72,6 +72,7 @@ These describe the NFL season itself, not the account; they are the same for eve
 | Entity | Description |
 |---|---|
 | League status | `pre_draft`, `drafting`, `in_season` or `complete`. Attributes: season, number of teams, playoff start week, playoff teams, scoring format (PPR, half PPR, standard). |
+| Team | Your team name (or display name) in the league, with your team's picture. |
 | Record | Your record as `W-L` or `W-L-T`. Attributes: wins, losses, ties as numbers for automations. |
 | Rank | Your position in the standings (win percentage, then points for). |
 | Points for, Points against | Season totals. Updated by Sleeper once a week is final. |
@@ -85,6 +86,12 @@ These describe the NFL season itself, not the account; they are the same for eve
 
 Matchup entities are `unknown` on a bye week, before the draft and outside the regular and
 post season.
+
+**Team** shows your team's picture instead of its icon, **Opponent** and **Opponent
+points** your opponent's. A team picture uploaded for the league is preferred over the
+manager's profile picture; without either, the icon stays. Your browser or the companion app loads the
+pictures directly from Sleeper's image server. Changed pictures show up with the hourly
+refresh of the league list.
 
 ### Big plays: events and the activity feed
 

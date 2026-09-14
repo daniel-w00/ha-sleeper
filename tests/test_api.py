@@ -17,6 +17,7 @@ from custom_components.sleeper.api import (
     SleeperClient,
     SleeperConnectionError,
     SleeperLeague,
+    SleeperLeagueUser,
     SleeperMatchup,
     SleeperNotFoundError,
     SleeperPlayer,
@@ -204,6 +205,7 @@ async def test_get_user_leagues(
     assert wombats.previous_league_id is None
     assert wombats.draft_id == "1392910064494333952"
     assert wombats.avatar == "leagueavatar"
+    assert wombats.avatar_url == "https://sleepercdn.com/avatars/thumbs/leagueavatar"
 
     assert test_league.name == "Test League"
     assert test_league.status == "pre_draft"
@@ -378,12 +380,36 @@ async def test_get_league_users(
     assert me.avatar == "abc"
     assert me.team_name == "Test Team"
     assert me.name == "Test Team"
+    assert me.team_avatar == "https://sleepercdn.com/uploads/testteam.jpg"
+    assert me.avatar_url == "https://sleepercdn.com/uploads/testteam.jpg"
     assert me.is_owner is True
 
     other = by_id["000000000000000012"]
     assert other.team_name is None
     assert other.name == "user_12"
+    assert other.team_avatar is None
+    assert other.avatar_url == "https://sleepercdn.com/avatars/thumbs/opponentavatar"
     assert other.is_owner is False
+
+    assert by_id["000000000000000003"].avatar_url is None
+
+
+@pytest.mark.parametrize(
+    "team_avatar", ["javascript:alert(1)", "http://example.com/a.jpg", 42]
+)
+def test_league_user_ignores_unsafe_team_avatar(team_avatar: object) -> None:
+    """Test a team picture that is not an https URL falls back to the avatar."""
+    user = SleeperLeagueUser.from_json(
+        {
+            "user_id": "1",
+            "display_name": "A",
+            "avatar": "abc",
+            "metadata": {"avatar": team_avatar},
+        }
+    )
+
+    assert user.team_avatar is None
+    assert user.avatar_url == "https://sleepercdn.com/avatars/thumbs/abc"
 
 
 async def test_get_matchups(

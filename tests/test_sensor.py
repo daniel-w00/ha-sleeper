@@ -54,6 +54,7 @@ async def test_sensor_values(
         ("sensor.test_user_nfl_season", "2026"),
         ("sensor.test_user_nfl_season_type", "regular"),
         ("sensor.wombats_league_league_status", "in_season"),
+        ("sensor.wombats_league_team", "Test Team"),
         ("sensor.wombats_league_record", "0-0"),
         ("sensor.wombats_league_rank", "1"),
         ("sensor.wombats_league_points_for", "0.0"),
@@ -107,6 +108,21 @@ async def test_sensor_values(
     assert opponent is not None
     assert opponent.attributes["opponent_roster_id"] == 5
     assert opponent.attributes["opponent_record"] == "0-0"
+
+    # Team pictures replace the icon only where the state names that team.
+    opponent_avatar = "https://sleepercdn.com/avatars/thumbs/opponentavatar"
+    for entity_id, picture in (
+        ("sensor.wombats_league_team", "https://sleepercdn.com/uploads/testteam.jpg"),
+        ("sensor.wombats_league_opponent_points", opponent_avatar),
+        ("sensor.wombats_league_opponent", opponent_avatar),
+        ("sensor.wombats_league_league_status", None),
+        ("sensor.wombats_league_matchup_points", None),
+        ("sensor.wombats_league_record", None),
+        ("sensor.test_league_opponent", None),
+    ):
+        entity_state = hass.states.get(entity_id)
+        assert entity_state is not None, entity_id
+        assert entity_state.attributes.get("entity_picture") == picture, entity_id
 
     # Pre-draft league: no matchup details, no FAAB entity.
     matchup = hass.states.get("sensor.test_league_matchup_points")

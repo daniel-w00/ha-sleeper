@@ -80,6 +80,9 @@
           }
         }
       },
+      "team": {
+        "name": "Team"
+      },
       "record": {
         "name": "Record",
         "state_attributes": {
