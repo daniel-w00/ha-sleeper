@@ -22,16 +22,6 @@
     }
   },
   "entity": {
-    "binary_sensor": {
-      "matchup_leading": {
-        "name": "Leading matchup",
-        "state_attributes": {
-          "margin": {
-            "name": "Margin"
-          }
-        }
-      }
-    },
     "sensor": {
       "week": {
         "name": "{sport} week"

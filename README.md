@@ -80,13 +80,21 @@ These describe the NFL season itself, not the account; they are the same for eve
 | Starters out | Number of your starters not expected to play: injury status Out, Doubtful, IR, PUP, suspended or similar, inactive players, and empty slots. Attribute: the affected starters with slot and reason. Questionable players are not counted. |
 | Opponent points | Your opponent's live points. |
 | Opponent | Your opponent's team name (or display name). Attributes: roster ID, record. |
-| Leading matchup | Binary sensor: on while your points exceed your opponent's. Attribute: margin. |
 | Last big play | The player of the latest big play in your matchup (see below), with the player's picture. Attributes: player ID, position, team, whether the player is yours, previous points, points, change, week. `unknown` until the first big play after a restart. |
 | Waiver position | Your position in the waiver order. |
 | Waiver budget remaining | Only in FAAB leagues. Attributes: budget, used. |
 
 Matchup entities are `unknown` on a bye week, before the draft and outside the regular and
 post season.
+
+To know whether you are ahead, create a template binary sensor helper
+(**Settings → Devices & services → Helpers → Create helper → Template**) that compares
+the two points sensors:
+
+```jinja
+{{ states('sensor.wombats_league_matchup_points') | float(0)
+   > states('sensor.wombats_league_opponent_points') | float(0) }}
+```
 
 **Team** shows your team's picture instead of its icon, **Opponent** and **Opponent
 points** your opponent's, **Last big play** the player's headshot (the team logo for a
