@@ -74,6 +74,7 @@ class SleeperPointsChange:
     roster_id: int
     player_id: str
     player: SleeperPlayer | None
+    picture: str | None
     previous: float
     points: float
     is_mine: bool
@@ -82,6 +83,11 @@ class SleeperPointsChange:
     def delta(self) -> float:
         """Return the change in points."""
         return round(self.points - self.previous, 2)
+
+    @property
+    def player_name(self) -> str:
+        """Return the player's name, or the ID if the player is unknown."""
+        return self.player.name if self.player is not None else self.player_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,7 +140,9 @@ class SleeperLeagueData:
     week: int
     my_roster: SleeperRoster | None
     player_lookup: PlayerLookup = _no_player
+    # Notable changes since the last poll, and the biggest one seen so far.
     points_changes: tuple[SleeperPointsChange, ...] = ()
+    last_big_play: SleeperPointsChange | None = None
 
     def _starters(self, player_ids: tuple[str, ...]) -> tuple[SleeperStarter, ...]:
         """Resolve a list of starter IDs to slots and players."""
@@ -327,6 +335,8 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         self._last_points_change: datetime | None = None
         # (league_id, week, roster_id, player_id) -> points of the last poll
         self._last_player_points: dict[tuple[str, int, int, str], float] = {}
+        # league_id -> biggest change of the last poll that had any
+        self._last_big_play: dict[str, SleeperPointsChange] = {}
 
     @override
     async def _async_update_data(self) -> SleeperData:
@@ -442,7 +452,8 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         poll count, so the yardage trickle stays quiet and touchdowns, field
         goals and fumbles come through. Keys include the week, so a new week
         starts from scratch instead of reporting every player dropping to
-        zero.
+        zero. The biggest change of a poll is remembered as the league's last
+        big play until the next poll with changes.
         """
         current: dict[tuple[str, int, int, str], float] = {}
         result: dict[str, SleeperLeagueData] = {}
@@ -463,18 +474,30 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
                         or abs(points - previous) < NOTABLE_POINTS_DELTA
                     ):
                         continue
+                    player = self.players.get(player_id)
                     changes.append(
                         SleeperPointsChange(
                             roster_id=matchup.roster_id,
                             player_id=player_id,
-                            player=self.players.get(player_id),
+                            player=player,
+                            picture=(
+                                None
+                                if player is None
+                                else player.picture_url(self.sport)
+                            ),
                             previous=previous,
                             points=points,
                             is_mine=matchup is data.my_matchup,
                         )
                     )
-            result[league_id] = (
-                replace(data, points_changes=tuple(changes)) if changes else data
+            if changes:
+                self._last_big_play[league_id] = max(
+                    changes, key=lambda change: abs(change.delta)
+                )
+            result[league_id] = replace(
+                data,
+                points_changes=tuple(changes),
+                last_big_play=self._last_big_play.get(league_id),
             )
         self._last_player_points = current
         return result
@@ -503,9 +526,10 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
                     "league_id": data.league.league_id,
                     "league": data.league.name,
                     "player_id": change.player_id,
-                    "player": player.name if player else change.player_id,
+                    "player": change.player_name,
                     "position": player.position if player else None,
                     "team": player.team if player else None,
+                    "picture": change.picture,
                     "roster_id": change.roster_id,
                     "is_mine": change.is_mine,
                     "previous_points": change.previous,

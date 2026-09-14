@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from aiohttp import ClientError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -506,6 +508,23 @@ async def test_get_players_null(
     )
 
     assert await client.get_players() == {}
+
+
+def test_player_picture_url() -> None:
+    """Test players get a headshot and team defenses their team's logo."""
+    player = SleeperPlayer.from_json({"player_id": 11560, "position": "QB"})
+    assert (
+        player.picture_url("nfl")
+        == "https://sleepercdn.com/content/nfl/players/thumb/11560.jpg"
+    )
+    defense = SleeperPlayer.from_json(
+        {"player_id": "PIT", "position": "DEF", "team": "PIT"}
+    )
+    assert (
+        defense.picture_url("nfl")
+        == "https://sleepercdn.com/images/team_logos/nfl/pit.png"
+    )
+    assert replace(defense, team=None).picture_url("nfl") is None
 
 
 def test_player_without_names() -> None:

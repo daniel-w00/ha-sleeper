@@ -48,6 +48,9 @@
       "opponent": {
         "default": "mdi:sword-cross"
       },
+      "last_big_play": {
+        "default": "mdi:lightning-bolt"
+      },
       "waiver_position": {
         "default": "mdi:format-list-numbered"
       },

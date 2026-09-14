@@ -81,6 +81,7 @@ These describe the NFL season itself, not the account; they are the same for eve
 | Opponent points | Your opponent's live points. |
 | Opponent | Your opponent's team name (or display name). Attributes: roster ID, record. |
 | Leading matchup | Binary sensor: on while your points exceed your opponent's. Attribute: margin. |
+| Last big play | The player of the latest big play in your matchup (see below), with the player's picture. Attributes: player ID, position, team, whether the player is yours, previous points, points, change, week. `unknown` until the first big play after a restart. |
 | Waiver position | Your position in the waiver order. |
 | Waiver budget remaining | Only in FAAB leagues. Attributes: budget, used. |
 
@@ -88,7 +89,8 @@ Matchup entities are `unknown` on a bye week, before the draft and outside the r
 post season.
 
 **Team** shows your team's picture instead of its icon, **Opponent** and **Opponent
-points** your opponent's. A team picture uploaded for the league is preferred over the
+points** your opponent's, **Last big play** the player's headshot (the team logo for a
+defense). A team picture uploaded for the league is preferred over the
 manager's profile picture; without either, the icon stays. Your browser or the companion app loads the
 pictures directly from Sleeper's image server. Changed pictures show up with the hourly
 refresh of the league list.
@@ -99,9 +101,10 @@ Whenever a starter on either side of your matchup gains or loses **3 or more poi
 two updates (a field goal, a touchdown, a long play, a fumble or a stat correction), the
 integration fires a `sleeper_player_scored` event. The league device's **Activity** feed and
 the logbook show these as readable lines, for example "Caleb Williams scored 6.3 points
-(24 total, Wombats League)".
+(24 total, Wombats League)". The **Last big play** sensor keeps the biggest change of the
+latest update that had any, so a dashboard card can show who just scored, with picture.
 
-The event data contains `player`, `player_id`, `position`, `team`, `roster_id`, `is_mine`,
+The event data contains `player`, `player_id`, `position`, `team`, `picture`, `roster_id`, `is_mine`,
 `previous_points`, `points`, `delta`, `week`, `matchup_id`, `league`, `league_id`,
 `user_id` and `device_id`. To celebrate your own touchdowns:
 

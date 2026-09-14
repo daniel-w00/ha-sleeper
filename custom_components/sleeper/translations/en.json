@@ -142,6 +142,35 @@
           }
         }
       },
+      "last_big_play": {
+        "name": "Last big play",
+        "state_attributes": {
+          "player_id": {
+            "name": "Player ID"
+          },
+          "position": {
+            "name": "Position"
+          },
+          "team": {
+            "name": "Team"
+          },
+          "is_mine": {
+            "name": "Own player"
+          },
+          "previous_points": {
+            "name": "Previous points"
+          },
+          "points": {
+            "name": "Points"
+          },
+          "delta": {
+            "name": "Change"
+          },
+          "week": {
+            "name": "Week"
+          }
+        }
+      },
       "waiver_position": {
         "name": "Waiver position"
       },

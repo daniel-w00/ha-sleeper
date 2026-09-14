@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from dataclasses import replace
 from datetime import timedelta
 import json
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
@@ -78,6 +80,20 @@ def matchups_for(league_id: str, week: int) -> tuple[SleeperMatchup, ...]:
     return tuple(
         SleeperMatchup.from_json(item) for item in load_json_fixture("matchups_1.json")
     )
+
+
+def matchups_with_points(
+    changes: dict[tuple[int, str], float],
+) -> tuple[SleeperMatchup, ...]:
+    """Return the fixture matchups with some player points replaced."""
+    result = []
+    for matchup in matchups_for(LEAGUE_ID, 1):
+        points = dict(matchup.players_points)
+        for (roster_id, player_id), value in changes.items():
+            if roster_id == matchup.roster_id:
+                points[player_id] = value
+        result.append(replace(matchup, players_points=MappingProxyType(points)))
+    return tuple(result)
 
 
 @pytest.fixture(autouse=True)

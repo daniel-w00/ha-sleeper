@@ -36,6 +36,12 @@ _LOGGER = logging.getLogger(__name__)
 
 BASE_URL = "https://api.sleeper.app/v1"
 AVATAR_URL = "https://sleepercdn.com/avatars"
+PLAYER_PICTURE_URL = (
+    "https://sleepercdn.com/content/{sport}/players/thumb/{player_id}.jpg"
+)
+TEAM_LOGO_URL = "https://sleepercdn.com/images/team_logos/{sport}/{team}.png"
+# Position of a team defense; its player ID is the team abbreviation.
+POSITION_DEFENSE = "DEF"
 DEFAULT_TIMEOUT = 10
 # The player list is >10 MB; give slow connections a chance.
 PLAYERS_TIMEOUT = 60
@@ -328,6 +334,18 @@ class SleeperPlayer:
             injury_status=data.get("injury_status") or None,
             fantasy_positions=_str_tuple(data.get("fantasy_positions")),
         )
+
+    def picture_url(self, sport: str) -> str | None:
+        """Return the player's headshot, or the team logo for a team defense.
+
+        Team defenses have no headshot (the CDN refuses the request), so
+        they get their team's logo. A defense without a team has no picture.
+        """
+        if self.position == POSITION_DEFENSE:
+            if self.team is None:
+                return None
+            return TEAM_LOGO_URL.format(sport=sport, team=self.team.lower())
+        return PLAYER_PICTURE_URL.format(sport=sport, player_id=self.player_id)
 
     def as_dict(self) -> dict[str, Any]:
         """Return the player in the shape ``from_json`` accepts."""

@@ -22,7 +22,13 @@ from custom_components.sleeper.const import (
     LEAGUE_REFRESH_INTERVAL,
 )
 
-from .conftest import LEAGUE_ID, TEST_USER_ID, async_poll, rosters_for
+from .conftest import (
+    LEAGUE_ID,
+    TEST_USER_ID,
+    async_poll,
+    matchups_with_points,
+    rosters_for,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -63,6 +69,7 @@ async def test_sensor_values(
         ("sensor.wombats_league_starters_out", "2"),
         ("sensor.wombats_league_opponent_points", "35.9"),
         ("sensor.wombats_league_opponent", "user_12"),
+        ("sensor.wombats_league_last_big_play", STATE_UNKNOWN),
         ("sensor.wombats_league_waiver_position", "6"),
         ("sensor.wombats_league_waiver_budget_remaining", "100"),
         ("sensor.test_league_league_status", "pre_draft"),
@@ -118,6 +125,7 @@ async def test_sensor_values(
         ("sensor.wombats_league_league_status", None),
         ("sensor.wombats_league_matchup_points", None),
         ("sensor.wombats_league_record", None),
+        ("sensor.wombats_league_last_big_play", None),
         ("sensor.test_league_opponent", None),
     ):
         entity_state = hass.states.get(entity_id)
@@ -132,6 +140,62 @@ async def test_sensor_values(
     record = entity_registry.async_get("sensor.wombats_league_record")
     assert record is not None
     assert record.unique_id == f"{TEST_USER_ID}_{LEAGUE_ID}_record"
+
+
+async def test_last_big_play(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test the last big play sensor follows the biggest change of a poll."""
+    entity_id = "sensor.wombats_league_last_big_play"
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == STATE_UNKNOWN
+    assert "player_id" not in state.attributes
+
+    # Baseline poll, then my QB scores a touchdown and the opponent's kicker
+    # loses points: the touchdown is the bigger change.
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    mock_client.get_matchups.side_effect = lambda league_id, week: matchups_with_points(
+        {(1, "11560"): 24.0, (5, "11792"): -3.0}
+    )
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "Caleb Williams"
+    assert state.attributes["entity_picture"] == (
+        "https://sleepercdn.com/content/nfl/players/thumb/11560.jpg"
+    )
+    assert state.attributes["player_id"] == "11560"
+    assert state.attributes["position"] == "QB"
+    assert state.attributes["team"] == "CHI"
+    assert state.attributes["is_mine"] is True
+    assert state.attributes["previous_points"] == 17.66
+    assert state.attributes["points"] == 24.0
+    assert state.attributes["delta"] == 6.34
+    assert state.attributes["week"] == 1
+
+    # A quiet poll keeps the last play.
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "Caleb Williams"
+
+    # My defense scores more than the opponent's kicker: the defense wins and
+    # shows the team logo instead of a headshot.
+    mock_client.get_matchups.side_effect = lambda league_id, week: matchups_with_points(
+        {(1, "11560"): 24.0, (1, "PIT"): 20.0, (5, "11792"): 3.0}
+    )
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "Pittsburgh Steelers"
+    assert state.attributes["position"] == "DEF"
+    assert state.attributes["entity_picture"] == (
+        "https://sleepercdn.com/images/team_logos/nfl/pit.png"
+    )
 
 
 async def test_sensors_without_own_roster(

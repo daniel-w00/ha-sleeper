@@ -108,6 +108,28 @@ def _waiver_budget_attributes(data: SleeperLeagueData) -> dict[str, Any]:
     }
 
 
+def _last_big_play_attributes(data: SleeperLeagueData) -> dict[str, Any]:
+    """Return the details of the last notable points change."""
+    if (change := data.last_big_play) is None:
+        return {}
+    player = change.player
+    return {
+        "player_id": change.player_id,
+        "position": None if player is None else player.position,
+        "team": None if player is None else player.team,
+        "is_mine": change.is_mine,
+        "previous_points": change.previous,
+        "points": change.points,
+        "delta": change.delta,
+        "week": data.week,
+    }
+
+
+def _last_big_play_picture(data: SleeperLeagueData) -> str | None:
+    """Return the picture of the player of the last notable points change."""
+    return None if (change := data.last_big_play) is None else change.picture
+
+
 def _my_picture(data: SleeperLeagueData) -> str | None:
     """Return the picture of the account's team."""
     return None if (user := data.my_user) is None else user.avatar_url
@@ -228,6 +250,15 @@ LEAGUE_SENSORS: tuple[SleeperLeagueSensorEntityDescription, ...] = (
         value_fn=lambda data: data.opponent_name,
         entity_picture_fn=_opponent_picture,
         attributes_fn=_opponent_attributes,
+    ),
+    SleeperLeagueSensorEntityDescription(
+        key="last_big_play",
+        translation_key="last_big_play",
+        value_fn=lambda data: (
+            None if data.last_big_play is None else data.last_big_play.player_name
+        ),
+        entity_picture_fn=_last_big_play_picture,
+        attributes_fn=_last_big_play_attributes,
     ),
     SleeperLeagueSensorEntityDescription(
         key="waiver_position",

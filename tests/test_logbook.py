@@ -24,21 +24,13 @@ from custom_components.sleeper.const import (
 from custom_components.sleeper.coordinator import league_device_identifier
 from custom_components.sleeper.logbook import async_describe_events
 
-from .conftest import LEAGUE_ID, TEST_USER_ID, async_poll, matchups_for
-
-
-def _with_points(
-    changes: dict[tuple[int, str], float],
-) -> tuple[SleeperMatchup, ...]:
-    """Return the fixture matchups with some player points replaced."""
-    result = []
-    for matchup in matchups_for(LEAGUE_ID, 1):
-        points = dict(matchup.players_points)
-        for (roster_id, player_id), value in changes.items():
-            if roster_id == matchup.roster_id:
-                points[player_id] = value
-        result.append(replace(matchup, players_points=MappingProxyType(points)))
-    return tuple(result)
+from .conftest import (
+    LEAGUE_ID,
+    TEST_USER_ID,
+    async_poll,
+    matchups_for,
+    matchups_with_points,
+)
 
 
 async def test_scoring_events(
@@ -58,7 +50,7 @@ async def test_scoring_events(
     # My QB scores a touchdown, my RB gains a little, my bench RB a lot, the
     # opponent's kicker (roster 5) loses points and someone in another
     # matchup scores too.
-    mock_client.get_matchups.side_effect = lambda league_id, week: _with_points(
+    mock_client.get_matchups.side_effect = lambda league_id, week: matchups_with_points(
         {
             (1, "11560"): 24.0,
             (1, "6813"): 11.0,
@@ -87,6 +79,7 @@ async def test_scoring_events(
         "player": "Caleb Williams",
         "position": "QB",
         "team": "CHI",
+        "picture": "https://sleepercdn.com/content/nfl/players/thumb/11560.jpg",
         "roster_id": 1,
         "is_mine": True,
         "previous_points": 17.66,
@@ -159,7 +152,7 @@ async def test_unknown_player_and_missing_device(
             )
             if matchup.roster_id == 1
             else matchup
-            for matchup in _with_points({(1, "11560"): 0.0})
+            for matchup in matchups_with_points({(1, "11560"): 0.0})
         )
 
     mock_client.get_matchups.side_effect = matchups
@@ -180,6 +173,7 @@ async def test_unknown_player_and_missing_device(
     assert events[0].data["device_id"] is None
     assert events[0].data["player"] == "ghost"
     assert events[0].data["position"] is None
+    assert events[0].data["picture"] is None
     assert events[0].data["delta"] == 6.5
 
 
