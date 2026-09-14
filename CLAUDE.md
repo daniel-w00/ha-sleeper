@@ -60,10 +60,10 @@ core integration.
 
 ## Open design notes
 
-- The account-level sensors (NFL week, season, season type) describe the sport, not the
-  account. They add little value on their own and are duplicated when several accounts are
-  configured. Kept for now (decided 2026-09-13); candidates for removal, or for moving to a
-  per-sport config entry if phase 2 adds more sport-wide data (trending players etc.).
+- The account device has no entities. The NFL week/season/season type sensors were removed
+  on 2026-09-15 (sport-wide, duplicated per account, available as attributes); `__init__.py`
+  deletes their registry entries on setup. Sport-wide data, if phase 2 adds any (trending
+  players etc.), belongs in a per-sport config entry, not on the account device.
 
 ## Quality scale (Bronze) — where each rule is satisfied
 

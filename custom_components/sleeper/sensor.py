@@ -18,22 +18,14 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from .api import WAIVER_TYPE_FAAB, SleeperMatchup, SleeperRoster
-from .const import LEAGUE_STATUSES, SEASON_TYPES, UNIT_PICKS, UNIT_POINTS
+from .const import LEAGUE_STATUSES, UNIT_PICKS, UNIT_POINTS
 from .coordinator import (
     SleeperConfigEntry,
     SleeperCoordinator,
-    SleeperData,
     SleeperLeagueData,
     SleeperUpcomingPick,
 )
-from .entity import SleeperEntity, SleeperLeagueEntity
-
-
-@dataclass(kw_only=True, frozen=True)
-class SleeperSensorEntityDescription(SensorEntityDescription):
-    """Describe an account-level Sleeper sensor."""
-
-    value_fn: Callable[[SleeperData], StateType]
+from .entity import SleeperLeagueEntity
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -229,26 +221,6 @@ def _opponent_picture(data: SleeperLeagueData) -> str | None:
     return None if (user := data.opponent_user) is None else user.avatar_url
 
 
-SENSORS: tuple[SleeperSensorEntityDescription, ...] = (
-    SleeperSensorEntityDescription(
-        key="week",
-        translation_key="week",
-        value_fn=lambda data: data.state.display_week,
-    ),
-    SleeperSensorEntityDescription(
-        key="season",
-        translation_key="season",
-        value_fn=lambda data: data.state.season,
-    ),
-    SleeperSensorEntityDescription(
-        key="season_type",
-        translation_key="season_type",
-        device_class=SensorDeviceClass.ENUM,
-        options=list(SEASON_TYPES),
-        value_fn=lambda data: data.state.season_type,
-    ),
-)
-
 LEAGUE_SENSORS: tuple[SleeperLeagueSensorEntityDescription, ...] = (
     SleeperLeagueSensorEntityDescription(
         key="league_status",
@@ -411,10 +383,6 @@ async def async_setup_entry(
 ) -> None:
     """Set up Sleeper sensors from a config entry."""
     coordinator = entry.runtime_data
-    async_add_entities(
-        SleeperSensor(coordinator, description) for description in SENSORS
-    )
-
     known_league_ids: set[str] = set()
 
     @callback
@@ -434,33 +402,6 @@ async def async_setup_entry(
 
     _async_add_league_sensors()
     entry.async_on_unload(coordinator.async_add_listener(_async_add_league_sensors))
-
-
-class SleeperSensor(SleeperEntity, SensorEntity):
-    """An account-level Sleeper sensor.
-
-    These report the state of the sport itself (week, season), so their names
-    carry the sport rather than anything account specific.
-    """
-
-    entity_description: SleeperSensorEntityDescription
-
-    def __init__(
-        self,
-        coordinator: SleeperCoordinator,
-        description: SleeperSensorEntityDescription,
-    ) -> None:
-        """Initialize the sensor."""
-        super().__init__(coordinator)
-        self.entity_description = description
-        self._attr_unique_id = f"{coordinator.config_entry.unique_id}_{description.key}"
-        self._attr_translation_placeholders = {"sport": coordinator.sport.upper()}
-
-    @property
-    @override
-    def native_value(self) -> StateType:
-        """Return the sensor value."""
-        return self.entity_description.value_fn(self.coordinator.data)
 
 
 class SleeperLeagueSensor(SleeperLeagueEntity, SensorEntity):

@@ -53,19 +53,14 @@ want a league in Home Assistant, disable its device under
 ## Entities
 
 The integration creates one **account device** and one **device per league** of that
-account. Entity IDs follow the pattern `sensor.<account>_<name>` and `sensor.<league>_<name>`.
-If two accounts share a league, each gets its own league device; the second account's
-entity IDs get a `_2` suffix.
+account. The account device groups the leagues and has no entities of its own; entity IDs
+follow the pattern `sensor.<league>_<name>`. If two accounts share a league, each gets its
+own league device; the second account's entity IDs get a `_2` suffix.
 
-### Account
-
-These describe the NFL season itself, not the account; they are the same for every league.
-
-| Entity | Description |
-|---|---|
-| NFL week | The current NFL week as reported by Sleeper. |
-| NFL season | The current NFL season. |
-| NFL season type | `pre`, `regular`, `post` or `off`. |
+The current NFL week is an attribute of **Matchup points** and the season an attribute of
+**League status**, so a "new week" automation is a state trigger on Matchup points with
+`attribute: week`. (Versions before 0.2.0 had NFL week, season and season type sensors on
+the account device; they are removed on update.)
 
 ### League
 
@@ -257,8 +252,6 @@ hour later.
 ## Known limitations
 
 - Only NFL leagues are supported.
-- The NFL week, season and season type sensors are created per account. With several
-  accounts they are duplicates; disable them on the additional accounts if they bother you.
 - The Sleeper API does not publish the NFL schedule, so the first score change of a game
   day is noticed at the idle interval (up to 15 minutes late). After that, updates run every
   60 seconds until scores stop changing.

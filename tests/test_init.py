@@ -177,3 +177,37 @@ async def test_two_accounts_in_one_league(
     assert second_device.config_entries == {second.entry_id}
     # Entities of the second account are separate as well.
     assert hass.states.get("sensor.wombats_league_rank_2") is not None
+
+
+async def test_stale_account_entities_removed(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test the account sensors of earlier versions are removed on setup."""
+    mock_config_entry.add_to_hass(hass)
+    for key in ("week", "season", "season_type"):
+        entity_registry.async_get_or_create(
+            "sensor",
+            DOMAIN,
+            f"{TEST_USER_ID}_{key}",
+            config_entry=mock_config_entry,
+            suggested_object_id=f"test_user_nfl_{key}",
+        )
+    stale = entity_registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{TEST_USER_ID}_{LEAGUE_ID}_record",
+        config_entry=mock_config_entry,
+    )
+    assert entity_registry.async_get("sensor.test_user_nfl_week") is not None
+
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    for key in ("week", "season", "season_type"):
+        assert entity_registry.async_get(f"sensor.test_user_nfl_{key}") is None
+    # Entities that still exist keep their registry entry.
+    assert entity_registry.async_get(stale.entity_id) is not None
+    assert hass.states.get(stale.entity_id) is not None

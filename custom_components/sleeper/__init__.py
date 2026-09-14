@@ -6,8 +6,8 @@ import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType
 
 from .const import DOMAIN
@@ -17,6 +17,10 @@ from .players import async_get_players
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
+
+# Unique ID suffixes of account-level sensors that earlier versions created
+# (NFL week, season and season type, removed in 0.2.0).
+REMOVED_ENTITY_KEYS = ("week", "season", "season_type")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SleeperConfigEntry) -> bool:
@@ -40,8 +44,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: SleeperConfigEntry) -> b
         configuration_url="https://sleeper.com/",
     )
 
+    _async_remove_stale_entities(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+@callback
+def _async_remove_stale_entities(
+    hass: HomeAssistant, entry: SleeperConfigEntry
+) -> None:
+    """Remove the registry entries of entities this version no longer creates."""
+    entity_registry = er.async_get(hass)
+    for key in REMOVED_ENTITY_KEYS:
+        entity_id = entity_registry.async_get_entity_id(
+            Platform.SENSOR, DOMAIN, f"{entry.unique_id}_{key}"
+        )
+        if entity_id is not None:
+            _LOGGER.debug("Removing entity %s of an earlier version", entity_id)
+            entity_registry.async_remove(entity_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: SleeperConfigEntry) -> bool:

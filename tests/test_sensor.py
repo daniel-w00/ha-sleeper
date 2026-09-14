@@ -62,9 +62,6 @@ async def test_sensor_values(
 ) -> None:
     """Test the key values of both leagues."""
     for entity_id, state in (
-        ("sensor.test_user_nfl_week", "1"),
-        ("sensor.test_user_nfl_season", "2026"),
-        ("sensor.test_user_nfl_season_type", "regular"),
         ("sensor.wombats_league_league_status", "in_season"),
         ("sensor.wombats_league_team", "Test Team"),
         ("sensor.wombats_league_record", "0-0"),

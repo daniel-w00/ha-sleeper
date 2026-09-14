@@ -17,7 +17,7 @@ from .coordinator import (
 
 
 class SleeperEntity(CoordinatorEntity[SleeperCoordinator]):
-    """Base class for the account-level entities of one config entry."""
+    """Base class for the entities of one config entry (account)."""
 
     _attr_has_entity_name = True
 

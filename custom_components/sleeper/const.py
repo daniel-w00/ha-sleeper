@@ -30,7 +30,6 @@ SCORING_SEASON_TYPES: Final = frozenset({"regular", "post"})
 LEAGUE_STATUS_IN_SEASON: Final = "in_season"
 
 # Entity option lists; the enum sensors translate these states.
-SEASON_TYPES: Final = ("pre", "regular", "post", "off")
 LEAGUE_STATUSES: Final = ("pre_draft", "drafting", "in_season", "complete")
 
 UNIT_POINTS: Final = "pts"

@@ -23,21 +23,6 @@
   },
   "entity": {
     "sensor": {
-      "week": {
-        "name": "{sport} week"
-      },
-      "season": {
-        "name": "{sport} season"
-      },
-      "season_type": {
-        "name": "{sport} season type",
-        "state": {
-          "pre": "Preseason",
-          "regular": "Regular season",
-          "post": "Postseason",
-          "off": "Off-season"
-        }
-      },
       "league_status": {
         "name": "League status",
         "state": {

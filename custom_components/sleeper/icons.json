@@ -1,15 +1,6 @@
 {
   "entity": {
     "sensor": {
-      "week": {
-        "default": "mdi:calendar-week"
-      },
-      "season": {
-        "default": "mdi:football"
-      },
-      "season_type": {
-        "default": "mdi:calendar-range"
-      },
       "league_status": {
         "default": "mdi:trophy-outline"
       },
