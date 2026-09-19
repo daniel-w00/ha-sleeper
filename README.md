@@ -10,6 +10,9 @@ Home Assistant entities, so you can build dashboards and automations around your
 season: get notified when your matchup score changes, show the current week on a wall
 tablet, or flash the lights when you take the lead.
 
+It is an unofficial, community-built integration and is not made, endorsed or supported by
+Sleeper — see [Disclaimer](#disclaimer).
+
 > **Status:** early development. Standings, live matchup scores with player names, scoring
 > events, waiver information and slow drafts of all your leagues are available;
 > transactions and playoffs are planned.
@@ -23,6 +26,14 @@ tablet, or flash the lights when you take the lead.
 ## Installation
 
 ### HACS (recommended)
+
+[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=daniel-w00&repository=ha-sleeper&category=integration)
+
+The button opens this repository in your own Home Assistant, where you can download it with
+**Download**. Confirm adding it as a custom repository if you are asked, then restart Home
+Assistant.
+
+Without the button:
 
 1. In Home Assistant open **HACS**.
 2. Open the three-dot menu in the top right and choose **Custom repositories**.
@@ -38,7 +49,9 @@ tablet, or flash the lights when you take the lead.
 
 ## Configuration
 
-1. Go to **Settings → Devices & services**.
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sleeper)
+
+1. Go to **Settings → Devices & services** (or use the button above).
 2. Select **Add integration** and search for **Sleeper**.
 3. Enter your Sleeper username and submit.
 
@@ -292,6 +305,24 @@ scripts/develop  # start a dev Home Assistant on http://localhost:8123
 scripts/test     # run the test suite with coverage
 scripts/lint     # ruff + pyright (use --fix to auto-format)
 ```
+
+## Disclaimer
+
+This is a custom (third-party) integration. It is not part of Home Assistant and not a
+Sleeper product. It is developed and maintained independently and is **not affiliated with,
+authorised by, endorsed or sponsored by Sleeper or its operators**, the NFL, or any of their
+partners. "Sleeper" and all other names, logos and marks belong to their respective owners
+and are used here only to describe which service this integration talks to. Home Assistant
+is a trademark of the Open Home Foundation.
+
+The integration uses Sleeper's public, read-only API. It never asks for your password and
+cannot change anything in your Sleeper account. That API is undocumented and unsupported:
+Sleeper can change or withdraw it at any time, which may break this integration without
+warning. Please report problems with the integration [in this
+repository](https://github.com/daniel-w00/ha-sleeper/issues) — never to Sleeper's or Home
+Assistant's support channels.
+
+Provided "as is", without warranty of any kind, see [LICENSE](LICENSE).
 
 ## License
 
