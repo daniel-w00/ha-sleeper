@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
@@ -140,13 +140,23 @@ async def test_download_failure(
     assert state is not None
     assert state.attributes["starters"][0]["player"] == "11560"
 
-    # No retry within the retry interval, even though the list is stale.
-    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
-    mock_client.get_players.assert_awaited_once()
+    # No retry within the retry interval, even though the list is stale, and
+    # no extra entity update beyond the poll's own.
+    coordinator = mock_config_entry.runtime_data
+    with patch.object(
+        coordinator,
+        "async_update_listeners",
+        wraps=coordinator.async_update_listeners,
+    ) as update_listeners:
+        await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+        mock_client.get_players.assert_awaited_once()
+        assert update_listeners.call_count == 1
 
-    mock_client.get_players.side_effect = None
-    await async_poll(hass, freezer, PLAYERS_RETRY_INTERVAL)
-    assert mock_client.get_players.await_count == 2
+        # A successful retry writes the entities again with the names.
+        mock_client.get_players.side_effect = None
+        await async_poll(hass, freezer, PLAYERS_RETRY_INTERVAL)
+        assert mock_client.get_players.await_count == 2
+        assert update_listeners.call_count == 3
     state = hass.states.get("sensor.wombats_league_matchup_points")
     assert state is not None
     assert state.attributes["starters"][0]["player"] == "Caleb Williams"

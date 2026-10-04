@@ -631,6 +631,10 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             # Player names are a nicety: a failed download must not fail a poll.
             _LOGGER.warning("Could not download the Sleeper player list: %s", err)
             return
+        # Within the retry interval of a failed download nothing was fetched,
+        # so there is nothing new to write.
+        if self.players.stale:
+            return
         self.async_update_listeners()
 
     @callback
