@@ -7,20 +7,35 @@ from typing import TYPE_CHECKING
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
+    entity_registry as er,
+)
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntryType
+from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN
 from .coordinator import SleeperConfigEntry, SleeperCoordinator
 from .players import async_get_players
+from .views import SleeperPlayerPictureView
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 # Unique ID suffixes of account-level sensors that earlier versions created
 # (NFL week, season and season type, removed in 0.2.0).
 REMOVED_ENTITY_KEYS = ("week", "season", "season_type")
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the view that serves square player pictures."""
+    hass.http.register_view(SleeperPlayerPictureView(async_get_clientsession(hass)))
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: SleeperConfigEntry) -> bool:

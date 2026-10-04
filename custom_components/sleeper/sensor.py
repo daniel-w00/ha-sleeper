@@ -17,7 +17,13 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
-from .api import WAIVER_TYPE_FAAB, SleeperMatchup, SleeperRoster
+from .api import (
+    POSITION_DEFENSE,
+    WAIVER_TYPE_FAAB,
+    SleeperMatchup,
+    SleeperPlayer,
+    SleeperRoster,
+)
 from .const import LEAGUE_STATUSES, UNIT_PICKS, UNIT_POINTS
 from .coordinator import (
     SleeperConfigEntry,
@@ -26,6 +32,7 @@ from .coordinator import (
     SleeperUpcomingPick,
 )
 from .entity import SleeperLeagueEntity
+from .views import player_picture_path
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -120,9 +127,25 @@ def _last_big_play_attributes(data: SleeperLeagueData) -> dict[str, Any]:
     }
 
 
+def _player_picture(player: SleeperPlayer | None, sport: str) -> str | None:
+    """Return the entity picture of a player.
+
+    Headshots are landscape and come through the view that crops them to a
+    square, so the head sits in the middle of the round badge. Team logos of
+    defenses are square already.
+    """
+    if player is None:
+        return None
+    if player.position == POSITION_DEFENSE:
+        return player.picture_url(sport)
+    return player_picture_path(sport, player.player_id)
+
+
 def _last_big_play_picture(data: SleeperLeagueData) -> str | None:
     """Return the picture of the player of the last notable points change."""
-    return None if (change := data.last_big_play) is None else change.picture
+    if (change := data.last_big_play) is None:
+        return None
+    return _player_picture(change.player, data.league.sport)
 
 
 def _my_picture(data: SleeperLeagueData) -> str | None:
@@ -214,7 +237,7 @@ def _last_pick_picture(data: SleeperLeagueData) -> str | None:
     """Return the picture of the most recently picked player."""
     if (pick := data.last_draft_pick) is None:
         return None
-    return pick.player.picture_url(data.league.sport)
+    return _player_picture(pick.player, data.league.sport)
 
 
 def _opponent_picture(data: SleeperLeagueData) -> str | None:

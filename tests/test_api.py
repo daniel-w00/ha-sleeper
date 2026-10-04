@@ -15,6 +15,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 
 from custom_components.sleeper.api import (
     BASE_URL,
+    PNG_SIGNATURE,
     WAIVER_TYPE_FAAB,
     WAIVER_TYPE_ROLLING,
     SleeperClient,
@@ -529,6 +530,37 @@ def test_player_picture_url() -> None:
         == "https://sleepercdn.com/images/team_logos/nfl/pit.png"
     )
     assert replace(defense, team=None).picture_url("nfl") is None
+
+
+async def test_get_player_picture(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test a headshot comes with the media type of its content."""
+    url = "https://sleepercdn.com/content/nfl/players/thumb/11560.jpg"
+    png = PNG_SIGNATURE + b"png data"
+    aioclient_mock.get(url, content=png, headers={"Content-Type": "image/jpeg"})
+
+    assert await client.get_player_picture("11560") == (png, "image/png")
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(url, content=b"\xff\xd8\xff jpeg data")
+
+    assert await client.get_player_picture("11560") == (
+        b"\xff\xd8\xff jpeg data",
+        "image/jpeg",
+    )
+
+
+async def test_get_player_picture_missing(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test the CDN's 403 for a missing headshot maps to not found."""
+    aioclient_mock.get(
+        "https://sleepercdn.com/content/nfl/players/thumb/99999999.jpg", status=403
+    )
+
+    with pytest.raises(SleeperNotFoundError):
+        await client.get_player_picture("99999999")
 
 
 def test_player_without_names() -> None:

@@ -26,6 +26,9 @@ Observed behaviour that the documentation does not mention:
   ``slot_to_roster_id``; the single draft endpoint has it.
 - Timestamps (``start_time``, ``last_picked``) are milliseconds since the
   epoch.
+- Player headshots are 350x254 PNG files (despite the ``.jpg`` name and
+  the ``image/jpeg`` content type) with a transparent background and the
+  head in the middle. The CDN answers 403, not 404, for missing files.
 """
 
 from __future__ import annotations
@@ -48,6 +51,7 @@ AVATAR_URL = "https://sleepercdn.com/avatars"
 PLAYER_PICTURE_URL = (
     "https://sleepercdn.com/content/{sport}/players/thumb/{player_id}.jpg"
 )
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 TEAM_LOGO_URL = "https://sleepercdn.com/images/team_logos/{sport}/{team}.png"
 # Position of a team defense; its player ID is the team abbreviation.
 POSITION_DEFENSE = "DEF"
@@ -612,17 +616,28 @@ class SleeperClient:
     async def _get_text(
         self, path: str, *, request_timeout: float | None = None
     ) -> str:
-        """Perform a GET request and return the raw body."""
+        """Perform a GET request on the API and return the raw body."""
         url = f"{BASE_URL}/{path.lstrip('/')}"
+        body = await self._get_bytes(url, request_timeout=request_timeout)
+        return body.decode()
+
+    async def _get_bytes(
+        self,
+        url: str,
+        *,
+        request_timeout: float | None = None,
+        not_found_statuses: tuple[int, ...] = (404,),
+    ) -> bytes:
+        """Perform a GET request and return the body."""
         _LOGGER.debug("GET %s", url)
         try:
             async with asyncio.timeout(request_timeout or self._timeout):
                 response = await self._session.get(url)
                 response.raise_for_status()
-                return await response.text()
+                return await response.read()
         except ClientResponseError as err:
-            if err.status == 404:
-                raise SleeperNotFoundError(path) from err
+            if err.status in not_found_statuses:
+                raise SleeperNotFoundError(url) from err
             raise SleeperConnectionError(f"HTTP {err.status} for {url}") from err
         except (ClientError, TimeoutError) as err:
             raise SleeperConnectionError(f"Error connecting to {url}: {err}") from err
@@ -637,6 +652,19 @@ class SleeperClient:
     async def _get_list(self, path: str) -> list[dict[str, Any]]:
         """GET a list, treating a ``null`` answer as an empty list."""
         return await self._get(path) or []
+
+    async def get_player_picture(self, player_id: str) -> tuple[bytes, str]:
+        """Fetch a player's headshot and return it with its media type.
+
+        The CDN labels headshots as JPEG but serves PNG, so the media type is
+        taken from the file itself. It answers 403 for players without one.
+        """
+        picture = await self._get_bytes(
+            PLAYER_PICTURE_URL.format(sport=self._sport, player_id=player_id),
+            not_found_statuses=(403, 404),
+        )
+        media_type = "image/png" if picture.startswith(PNG_SIGNATURE) else "image/jpeg"
+        return picture, media_type
 
     async def get_user(self, username_or_id: str) -> SleeperUser:
         """Fetch a user by username or user ID."""

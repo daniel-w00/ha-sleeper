@@ -151,7 +151,7 @@
 # name: test_sensors[sensor.test_league_last_pick-state]
   StateSnapshot({
     'attributes': ReadOnlyDict({
-      <EntityStateAttribute.ENTITY_PICTURE: 'entity_picture'>: 'https://sleepercdn.com/content/nfl/players/thumb/4866.jpg',
+      <EntityStateAttribute.ENTITY_PICTURE: 'entity_picture'>: '/api/sleeper/player_picture/nfl/4866',
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test League Last pick',
       'is_keeper': False,
       'is_mine': False,
@@ -1093,7 +1093,7 @@
 # name: test_sensors[sensor.wombats_league_last_pick-state]
   StateSnapshot({
     'attributes': ReadOnlyDict({
-      <EntityStateAttribute.ENTITY_PICTURE: 'entity_picture'>: 'https://sleepercdn.com/content/nfl/players/thumb/5189.jpg',
+      <EntityStateAttribute.ENTITY_PICTURE: 'entity_picture'>: '/api/sleeper/player_picture/nfl/5189',
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Wombats League Last pick',
       'is_keeper': False,
       'is_mine': False,

@@ -115,9 +115,11 @@ the two points sensors:
 **Team** shows your team's picture instead of its icon, **Opponent** and **Opponent
 points** your opponent's, **Last big play** the player's headshot (the team logo for a
 defense). A team picture uploaded for the league is preferred over the
-manager's profile picture; without either, the icon stays. Your browser or the companion app loads the
-pictures directly from Sleeper's image server. Changed pictures show up with the hourly
-refresh of the league list.
+manager's profile picture; without either, the icon stays. Your browser or the companion app loads
+team pictures and logos directly from Sleeper's image server. Player headshots are wide, so
+Home Assistant fetches them and serves them cropped to a square
+(`/api/sleeper/player_picture/…`); otherwise the round badge shows the head off to the side.
+Changed pictures show up with the hourly refresh of the league list.
 
 ### Big plays: trigger, events and the activity feed
 

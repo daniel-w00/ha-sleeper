@@ -18,12 +18,17 @@ from pytest_homeassistant_custom_component.common import (
 )
 from syrupy.assertion import SnapshotAssertion
 
-from custom_components.sleeper.api import SleeperLeague, SleeperNotFoundError
+from custom_components.sleeper.api import (
+    SleeperLeague,
+    SleeperNotFoundError,
+    SleeperPlayer,
+)
 from custom_components.sleeper.const import (
     DRAFT_UPDATE_INTERVAL,
     IDLE_SEASON_UPDATE_INTERVAL,
     LEAGUE_REFRESH_INTERVAL,
 )
+from custom_components.sleeper.sensor import _player_picture
 
 from .conftest import (
     DRAFTING_DRAFT_ID,
@@ -139,17 +144,11 @@ async def test_sensor_values(
         ("sensor.wombats_league_record", None),
         ("sensor.wombats_league_last_big_play", None),
         ("sensor.wombats_league_on_the_clock", None),
-        (
-            "sensor.wombats_league_last_pick",
-            "https://sleepercdn.com/content/nfl/players/thumb/5189.jpg",
-        ),
+        ("sensor.wombats_league_last_pick", "/api/sleeper/player_picture/nfl/5189"),
         ("sensor.test_league_opponent", None),
         # user_3 has no picture of any kind.
         ("sensor.test_league_on_the_clock", None),
-        (
-            "sensor.test_league_last_pick",
-            "https://sleepercdn.com/content/nfl/players/thumb/4866.jpg",
-        ),
+        ("sensor.test_league_last_pick", "/api/sleeper/player_picture/nfl/4866"),
     ):
         entity_state = hass.states.get(entity_id)
         assert entity_state is not None, entity_id
@@ -249,7 +248,7 @@ async def test_last_big_play(
     # event already describes each play there.
     assert is_sensor_continuous(hass, er.async_get(hass), entity_id)
     assert state.attributes["entity_picture"] == (
-        "https://sleepercdn.com/content/nfl/players/thumb/11560.jpg"
+        "/api/sleeper/player_picture/nfl/11560"
     )
     assert state.attributes["player_id"] == "11560"
     assert state.attributes["position"] == "QB"
@@ -445,3 +444,17 @@ async def test_draft_sensors_when_draft_vanishes(
         assert state.state == STATE_UNKNOWN, entity_id
         assert "pick_no" not in state.attributes
         assert "draft_id" not in state.attributes
+
+
+def test_player_picture() -> None:
+    """Test headshots go through the square view and defenses keep the logo."""
+    player = SleeperPlayer.from_json({"player_id": "11560", "position": "QB"})
+    defense = SleeperPlayer.from_json(
+        {"player_id": "PIT", "position": "DEF", "team": "PIT"}
+    )
+
+    assert _player_picture(player, "nfl") == "/api/sleeper/player_picture/nfl/11560"
+    assert _player_picture(defense, "nfl") == (
+        "https://sleepercdn.com/images/team_logos/nfl/pit.png"
+    )
+    assert _player_picture(None, "nfl") is None
