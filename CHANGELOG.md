@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-04
+
+### Changed
+
+- **Last big play** now holds the points of the play (with the unit `pts`) instead of the
+  player's name, which moved to the `player` attribute. Each big play now shows up only
+  once in the activity feed.
+- All leagues are fetched in parallel, and the player list downloads in the background:
+  the entities appear at once and get the player names as soon as the list has arrived.
+
+### Fixed
+
+- Player headshots are centred in the round entity pictures. Home Assistant now serves
+  them cropped to a square from `/api/sleeper/player_picture/…`.
+- Entities are no longer rewritten on every poll while a failed player list download
+  waits for its retry.
+
 ## [0.2.0] - 2026-09-20
 
 ### Added
@@ -43,6 +60,7 @@ All notable changes to this project are documented here. The format follows
 - Development environment (uv venv pinned to Home Assistant 2026.9.2), tests, and CI with
   hassfest and HACS validation.
 
-[Unreleased]: https://github.com/daniel-w00/ha-sleeper/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/daniel-w00/ha-sleeper/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/daniel-w00/ha-sleeper/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/daniel-w00/ha-sleeper/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/daniel-w00/ha-sleeper/releases/tag/v0.1.0
