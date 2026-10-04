@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 from typing import Any
 from unittest.mock import MagicMock
@@ -23,7 +24,7 @@ from custom_components.sleeper.const import (
 )
 from custom_components.sleeper.players import PLAYERS_KEY
 
-from .conftest import async_poll, load_json_fixture
+from .conftest import async_poll, load_json_fixture, players_fixture
 
 STORAGE_KEY = f"{DOMAIN}.players_nfl"
 
@@ -146,6 +147,42 @@ async def test_download_failure(
     mock_client.get_players.side_effect = None
     await async_poll(hass, freezer, PLAYERS_RETRY_INTERVAL)
     assert mock_client.get_players.await_count == 2
+    state = hass.states.get("sensor.wombats_league_matchup_points")
+    assert state is not None
+    assert state.attributes["starters"][0]["player"] == "Caleb Williams"
+
+
+async def test_setup_does_not_wait_for_the_download(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_client: MagicMock,
+) -> None:
+    """Test the entities appear while the player list is still downloading."""
+    downloaded = asyncio.Event()
+    players = players_fixture()
+
+    async def _slow_download() -> dict[str, Any]:
+        await downloaded.wait()
+        return players
+
+    mock_client.get_players.side_effect = _slow_download
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+    state = hass.states.get("sensor.wombats_league_matchup_points")
+    assert state is not None
+    assert state.attributes["starters"][0]["player"] == "11560"
+
+    # A poll while the download runs does not start a second one. It is
+    # refreshed directly: waiting for a scheduled poll would also wait for
+    # the download this test is holding up.
+    await mock_config_entry.runtime_data.async_refresh()
+    mock_client.get_players.assert_awaited_once()
+
+    downloaded.set()
+    await hass.async_block_till_done(wait_background_tasks=True)
     state = hass.states.get("sensor.wombats_league_matchup_points")
     assert state is not None
     assert state.attributes["starters"][0]["player"] == "Caleb Williams"

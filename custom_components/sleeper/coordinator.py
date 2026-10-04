@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
@@ -536,27 +537,27 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         self._last_player_points: dict[tuple[str, int, int, str], float] = {}
         # league_id -> biggest change of the last poll that had any
         self._last_big_play: dict[str, SleeperPointsChange] = {}
+        # The running background download of the player list, if any.
+        self._players_refresh: asyncio.Task[None] | None = None
 
     @override
     async def _async_update_data(self) -> SleeperData:
         """Fetch the latest data from Sleeper."""
         now = dt_util.utcnow()
+        if self.players.stale:
+            self._async_schedule_player_refresh()
         try:
             state = await self.client.get_sport_state()
             if self._leagues_need_refresh(now, state):
                 await self._async_refresh_leagues(now, state)
-            leagues = {
-                league.league_id: await self._async_fetch_league(league, state)
-                for league in self._leagues
-            }
+            # One league takes three requests; fetching the leagues in
+            # parallel keeps a poll as short as its slowest league.
+            fetched = await asyncio.gather(
+                *(self._async_fetch_league(league, state) for league in self._leagues)
+            )
         except SleeperError as err:
             raise UpdateFailed(f"Error communicating with Sleeper: {err}") from err
-
-        # Player names are a nicety: a failed download must not fail the poll.
-        try:
-            await self.players.async_refresh_if_stale()
-        except SleeperError as err:
-            _LOGGER.warning("Could not download the Sleeper player list: %s", err)
+        leagues = {data.league.league_id: data for data in fetched}
 
         if TYPE_CHECKING:
             assert self._user is not None
@@ -580,14 +581,15 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         self, now: datetime, state: SleeperSportState
     ) -> None:
         """Reload the user profile, the league list and the league members."""
-        self._user = await self.client.get_user(self.user_id)
-        leagues = await self.client.get_user_leagues(self.user_id, state.league_season)
-        self._league_users = {
-            league.league_id: await self.client.get_league_users(league.league_id)
-            for league in leagues
-        }
-        for league in leagues:
-            await self._async_refresh_draft(league)
+        self._user, leagues = await asyncio.gather(
+            self.client.get_user(self.user_id),
+            self.client.get_user_leagues(self.user_id, state.league_season),
+        )
+        self._league_users = dict(
+            await asyncio.gather(
+                *(self._async_refresh_league_members(league) for league in leagues)
+            )
+        )
         self._leagues = leagues
         self._league_season = state.league_season
         self._leagues_refreshed = now
@@ -595,6 +597,41 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             "Loaded %d leagues for season %s", len(leagues), state.league_season
         )
         self._async_remove_stale_league_devices()
+
+    async def _async_refresh_league_members(
+        self, league: SleeperLeague
+    ) -> tuple[str, tuple[SleeperLeagueUser, ...]]:
+        """Reload the members and the draft of one league."""
+        users, _ = await asyncio.gather(
+            self.client.get_league_users(league.league_id),
+            self._async_refresh_draft(league),
+        )
+        return league.league_id, users
+
+    @callback
+    def _async_schedule_player_refresh(self) -> None:
+        """Download the player list in the background.
+
+        The list is over 10 MB and only supplies names, positions and injury
+        statuses. Waiting for it would hold up the first poll, and with it
+        the entities, for no gain: the entities are written again as soon as
+        it has arrived.
+        """
+        if self._players_refresh is not None and not self._players_refresh.done():
+            return
+        self._players_refresh = self.config_entry.async_create_background_task(
+            self.hass, self._async_refresh_players(), f"{DOMAIN} player list"
+        )
+
+    async def _async_refresh_players(self) -> None:
+        """Refresh the shared player list and rewrite the entities."""
+        try:
+            await self.players.async_refresh_if_stale()
+        except SleeperError as err:
+            # Player names are a nicety: a failed download must not fail a poll.
+            _LOGGER.warning("Could not download the Sleeper player list: %s", err)
+            return
+        self.async_update_listeners()
 
     @callback
     def _async_remove_stale_league_devices(self) -> None:

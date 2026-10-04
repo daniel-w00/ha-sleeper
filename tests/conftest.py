@@ -59,10 +59,15 @@ def load_json_fixture(name: str) -> Any:
 async def async_poll(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory, delta: timedelta
 ) -> None:
-    """Advance time and let the coordinator poll."""
+    """Advance time and let the coordinator poll.
+
+    Scheduled coordinator refreshes and the player list download are
+    background tasks, which ``async_block_till_done`` only waits for when it
+    is asked to.
+    """
     freezer.tick(delta)
     async_fire_time_changed(hass)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
 
 
 def players_fixture() -> dict[str, SleeperPlayer]:
@@ -273,9 +278,15 @@ async def init_integration(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
 ) -> MockConfigEntry:
-    """Set up the integration with the mocked client."""
+    """Set up the integration with the mocked client.
+
+    Requesting ``freezer`` freezes the clock before the setup. Otherwise the
+    event loop clock jumps when a test requests it later, and the first
+    scheduled poll fires at once, racing the poll the test triggers.
+    """
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
+    await hass.async_block_till_done(wait_background_tasks=True)
     return mock_config_entry
