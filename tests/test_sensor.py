@@ -7,6 +7,7 @@ from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 from freezegun.api import FrozenDateTimeFactory
+from homeassistant.components.logbook.helpers import is_sensor_continuous
 from homeassistant.const import STATE_UNKNOWN, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -241,7 +242,12 @@ async def test_last_big_play(
     await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
     state = hass.states.get(entity_id)
     assert state is not None
-    assert state.state == "Caleb Williams"
+    assert state.state == "6.34"
+    assert state.attributes["unit_of_measurement"] == "pts"
+    assert state.attributes["player"] == "Caleb Williams"
+    # Numeric with a unit: the logbook leaves its changes out, as the scoring
+    # event already describes each play there.
+    assert is_sensor_continuous(hass, er.async_get(hass), entity_id)
     assert state.attributes["entity_picture"] == (
         "https://sleepercdn.com/content/nfl/players/thumb/11560.jpg"
     )
@@ -258,7 +264,7 @@ async def test_last_big_play(
     await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
     state = hass.states.get(entity_id)
     assert state is not None
-    assert state.state == "Caleb Williams"
+    assert state.attributes["player"] == "Caleb Williams"
 
     # My defense scores more than the opponent's kicker: the defense wins and
     # shows the team logo instead of a headshot.
@@ -268,7 +274,7 @@ async def test_last_big_play(
     await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
     state = hass.states.get(entity_id)
     assert state is not None
-    assert state.state == "Pittsburgh Steelers"
+    assert state.attributes["player"] == "Pittsburgh Steelers"
     assert state.attributes["position"] == "DEF"
     assert state.attributes["entity_picture"] == (
         "https://sleepercdn.com/images/team_logos/nfl/pit.png"

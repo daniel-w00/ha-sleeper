@@ -126,7 +126,10 @@ two updates (a field goal, a touchdown, a long play, a fumble or a stat correcti
 integration reports a big play. The league device's **Activity** feed and the logbook show
 these as readable lines, for example "Caleb Williams scored 6.3 points (24 total, Wombats
 League)". The **Last big play** sensor keeps the biggest change of the latest update that had
-any, so a dashboard card can show who just scored, with picture.
+any, so a dashboard card can show who just scored, with picture. Its value is the points of
+that play; the player's name (`player`), the total (`points`) and the other details are
+attributes. Being a number, it stays out of the activity feed, so each play appears there
+only once.
 
 #### Trigger: Player scored
 

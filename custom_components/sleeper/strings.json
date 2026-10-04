@@ -120,6 +120,9 @@
       "last_big_play": {
         "name": "Last big play",
         "state_attributes": {
+          "player": {
+            "name": "Player"
+          },
           "player_id": {
             "name": "Player ID"
           },

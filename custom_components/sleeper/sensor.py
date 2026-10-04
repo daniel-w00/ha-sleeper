@@ -108,6 +108,7 @@ def _last_big_play_attributes(data: SleeperLeagueData) -> dict[str, Any]:
         return {}
     player = change.player
     return {
+        "player": change.player_name,
         "player_id": change.player_id,
         "position": None if player is None else player.position,
         "team": None if player is None else player.team,
@@ -315,8 +316,12 @@ LEAGUE_SENSORS: tuple[SleeperLeagueSensorEntityDescription, ...] = (
     SleeperLeagueSensorEntityDescription(
         key="last_big_play",
         translation_key="last_big_play",
+        # Numeric with a unit, so the logbook skips its state changes: the
+        # sleeper_player_scored event already puts each play in the activity feed.
+        native_unit_of_measurement=UNIT_POINTS,
+        suggested_display_precision=2,
         value_fn=lambda data: (
-            None if data.last_big_play is None else data.last_big_play.player_name
+            None if data.last_big_play is None else data.last_big_play.delta
         ),
         entity_picture_fn=_last_big_play_picture,
         attributes_fn=_last_big_play_attributes,
