@@ -318,6 +318,8 @@ hour later.
   scores stop changing.
 - Projections and win probability are the integration's own calculation and can differ a
   little from the Sleeper app.
+- A starter ruled out during a game keeps their projection for the rest of it; the Sleeper
+  app counts only the points they have scored so far once they are officially out.
 - Fast drafts (pick clocks of a minute or two) cannot be followed in time because of the
   60 second cache, see the Drafts section.
 - Transactions and playoff brackets are planned for a later release.
