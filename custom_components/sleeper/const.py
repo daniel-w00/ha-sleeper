@@ -8,14 +8,24 @@ DOMAIN: Final = "sleeper"
 DEFAULT_SPORT: Final = "nfl"
 
 # Polling. Sleeper's CDN caches every response for 60 seconds, so 60 seconds
-# is the fastest interval that can ever return new data. The API has no game
-# schedule, so the coordinator switches to the live interval while matchup
-# points are changing and falls back to the idle intervals otherwise.
+# is the fastest interval that can ever return new data. The coordinator
+# switches to the live interval while a game with a starter of the account's
+# matchups is running or matchup points are changing, and falls back to the
+# idle intervals otherwise.
 LIVE_UPDATE_INTERVAL: Final = timedelta(seconds=60)
 IDLE_SEASON_UPDATE_INTERVAL: Final = timedelta(minutes=15)
 IDLE_OFFSEASON_UPDATE_INTERVAL: Final = timedelta(hours=1)
 # How long after the last observed points change the live interval is kept.
 LIVE_GRACE_PERIOD: Final = timedelta(minutes=30)
+# How long after its kickoff a game Sleeper still shows as not started keeps
+# the live interval.
+KICKOFF_GRACE_PERIOD: Final = timedelta(minutes=30)
+# Projections and games come from Sleeper's GraphQL API, which is not cached.
+# Projections of players yet to play are requested again this often (Sleeper
+# updates them about hourly); the games while none of the matchups' games is
+# running, to follow changes of the kickoff times.
+PROJECTIONS_REFRESH_INTERVAL: Final = timedelta(hours=1)
+GAMES_REFRESH_INTERVAL: Final = timedelta(hours=1)
 # How often the league list, league members and the user profile are reloaded.
 LEAGUE_REFRESH_INTERVAL: Final = timedelta(hours=1)
 # While a draft is running and nobody has picked for LIVE_GRACE_PERIOD.
@@ -33,6 +43,12 @@ LEAGUE_STATUS_IN_SEASON: Final = "in_season"
 LEAGUE_STATUSES: Final = ("pre_draft", "drafting", "in_season", "complete")
 
 UNIT_POINTS: Final = "pts"
+
+# Standard deviation, in points, of a matchup's final margin around its
+# projected margin before any game has started. Backtested on a 12-team
+# half-PPR league (2026 weeks 1-6, 36 matchups): 28.8. It shrinks with the
+# square root of the share of projected points still to be played.
+MATCHUP_MARGIN_STDDEV: Final = 29.0
 UNIT_PICKS: Final = "picks"
 
 # Player list: Sleeper asks for at most one download per day.

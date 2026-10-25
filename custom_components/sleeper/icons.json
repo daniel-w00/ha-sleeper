@@ -28,6 +28,15 @@
       "opponent_points": {
         "default": "mdi:football-helmet"
       },
+      "projected_points": {
+        "default": "mdi:crystal-ball"
+      },
+      "opponent_projected_points": {
+        "default": "mdi:crystal-ball"
+      },
+      "win_probability": {
+        "default": "mdi:chart-bell-curve-cumulative"
+      },
       "opponent": {
         "default": "mdi:sword-cross"
       },

@@ -1,0 +1,246 @@
+{
+  "data": {
+    "scores": [
+      {
+        "game_id": "202610105",
+        "status": "complete",
+        "start_time": 1789318800000,
+        "metadata": {
+          "away_team": "CHI",
+          "home_team": "CAR",
+          "away_score": 59,
+          "home_score": 37,
+          "quarter_num": 4,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610107",
+        "status": "complete",
+        "start_time": 1789318800000,
+        "metadata": {
+          "away_team": "TB",
+          "home_team": "CIN",
+          "away_score": 27,
+          "home_score": 33,
+          "quarter_num": 4,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610111",
+        "status": "complete",
+        "start_time": 1789318800000,
+        "metadata": {
+          "away_team": "NO",
+          "home_team": "DET",
+          "away_score": 30,
+          "home_score": 31,
+          "quarter_num": 5,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610113",
+        "status": "complete",
+        "start_time": 1789318800000,
+        "metadata": {
+          "away_team": "BUF",
+          "home_team": "HOU",
+          "away_score": 36,
+          "home_score": 31,
+          "quarter_num": 4,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610114",
+        "status": "in_game",
+        "start_time": 1789318800000,
+        "metadata": {
+          "away_team": "BAL",
+          "home_team": "IND",
+          "away_score": 17,
+          "home_score": 10,
+          "quarter_num": 3,
+          "time_remaining": "7:30",
+          "is_in_progress": true,
+          "is_over": false
+        }
+      },
+      {
+        "game_id": "202610115",
+        "status": "complete",
+        "start_time": 1789318800000,
+        "metadata": {
+          "away_team": "CLE",
+          "home_team": "JAX",
+          "away_score": 10,
+          "home_score": 34,
+          "quarter_num": 4,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610116",
+        "status": "pre_game",
+        "start_time": 1789431300000,
+        "metadata": {
+          "away_team": "DEN",
+          "home_team": "KC",
+          "away_score": null,
+          "home_score": null,
+          "quarter_num": "",
+          "time_remaining": null,
+          "is_in_progress": false,
+          "is_over": false
+        }
+      },
+      {
+        "game_id": "202610120",
+        "status": "complete",
+        "start_time": 1789331100000,
+        "metadata": {
+          "away_team": "GB",
+          "home_team": "MIN",
+          "away_score": 22,
+          "home_score": 39,
+          "quarter_num": 4,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610123",
+        "status": "complete",
+        "start_time": 1789345200000,
+        "metadata": {
+          "away_team": "DAL",
+          "home_team": "NYG",
+          "away_score": 20,
+          "home_score": 28,
+          "quarter_num": 4,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610125",
+        "status": "complete",
+        "start_time": 1789331100000,
+        "metadata": {
+          "away_team": "MIA",
+          "home_team": "LV",
+          "away_score": 13,
+          "home_score": 27,
+          "quarter_num": 4,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610126",
+        "status": "complete",
+        "start_time": 1789331100000,
+        "metadata": {
+          "away_team": "WAS",
+          "home_team": "PHI",
+          "away_score": 22,
+          "home_score": 24,
+          "quarter_num": 4,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610128",
+        "status": "complete",
+        "start_time": 1789318800000,
+        "metadata": {
+          "away_team": "ATL",
+          "home_team": "PIT",
+          "away_score": 13,
+          "home_score": 20,
+          "quarter_num": 4,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610129",
+        "status": "complete",
+        "start_time": 1789331100000,
+        "metadata": {
+          "away_team": "ARI",
+          "home_team": "LAC",
+          "away_score": 26,
+          "home_score": 14,
+          "quarter_num": 4,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610130",
+        "status": "complete",
+        "start_time": 1788999600000,
+        "metadata": {
+          "away_team": "NE",
+          "home_team": "SEA",
+          "away_score": 10,
+          "home_score": 13,
+          "quarter_num": 4,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610132",
+        "status": "complete",
+        "start_time": 1789086900000,
+        "metadata": {
+          "away_team": "SF",
+          "home_team": "LAR",
+          "away_score": 27,
+          "home_score": 7,
+          "quarter_num": 4,
+          "time_remaining": "00:00",
+          "is_in_progress": false,
+          "is_over": true
+        }
+      },
+      {
+        "game_id": "202610134",
+        "status": "pre_game",
+        "start_time": 1789318800000,
+        "metadata": {
+          "away_team": "NYJ",
+          "home_team": "TEN",
+          "away_score": null,
+          "home_score": null,
+          "quarter_num": "",
+          "time_remaining": null,
+          "is_in_progress": false,
+          "is_over": false
+        }
+      }
+    ]
+  }
+}

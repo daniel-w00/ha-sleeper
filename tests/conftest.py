@@ -27,10 +27,12 @@ from syrupy.assertion import SnapshotAssertion
 from custom_components.sleeper.api import (
     SleeperDraft,
     SleeperDraftPick,
+    SleeperGame,
     SleeperLeague,
     SleeperLeagueUser,
     SleeperMatchup,
     SleeperPlayer,
+    SleeperProjection,
     SleeperRoster,
     SleeperSportState,
     SleeperTradedPick,
@@ -91,6 +93,28 @@ def matchups_for(league_id: str, week: int) -> tuple[SleeperMatchup, ...]:
     return tuple(
         SleeperMatchup.from_json(item) for item in load_json_fixture("matchups_1.json")
     )
+
+
+def projections_fixture() -> dict[str, SleeperProjection]:
+    """Return the week 1 projections of both sides of the account's matchup.
+
+    Captured for the starters of rosters 1 and 5 in the matchups fixture.
+    """
+    data = load_json_fixture("projections_1.json")["data"]
+    return {
+        item["player_id"]: SleeperProjection.from_json(item)
+        for item in data["stats_for_players_in_week"]
+    }
+
+
+def games_fixture() -> tuple[SleeperGame, ...]:
+    """Return the week 1 games, as the client would.
+
+    BAL @ IND is in the third quarter (7:30 left), DEN @ KC and NYJ @ TEN
+    have not started; all other games are over.
+    """
+    data = load_json_fixture("scores_1.json")["data"]
+    return tuple(SleeperGame.from_json(item) for item in data["scores"])
 
 
 def _draft_fixture(draft_id: str) -> str:
@@ -259,6 +283,8 @@ def mock_client(
         client.get_draft = AsyncMock(side_effect=draft_for)
         client.get_draft_picks = AsyncMock(side_effect=draft_picks_for)
         client.get_draft_traded_picks = AsyncMock(side_effect=traded_picks_for)
+        client.get_projections = AsyncMock(return_value=projections_fixture())
+        client.get_games = AsyncMock(return_value=games_fixture())
         yield client
 
 

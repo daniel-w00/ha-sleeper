@@ -29,12 +29,27 @@ Observed behaviour that the documentation does not mention:
 - Player headshots are 350x254 PNG files (despite the ``.jpg`` name and
   the ``image/jpeg`` content type) with a transparent background and the
   head in the middle. The CDN answers 403, not 404, for missing files.
+
+Projections and the live state of the NFL games are not part of the
+documented API. They come from the GraphQL API the Sleeper app uses
+(``GRAPHQL_URL``), which answers these two queries without authentication;
+most others, including the app's matchup projections, need a login.
+
+- Matchup projections and win probabilities are computed by the app; the
+  API only has each player's projected stat line (by Rotowire), which is
+  scored with the league's ``scoring_settings`` like the real stats are.
+- Projections keep their pre-game values while and after a game is played.
+- Projections count every field goal of 50+ yards as ``fgm_50p`` and have
+  no ``fgmiss``, while leagues usually score ``fgm_50_59``, ``fgm_60p``
+  and ``fgmiss``; see :meth:`SleeperLeague.fantasy_points`.
+- A game's clock is ``quarter_num`` (5 in overtime) and ``time_remaining``
+  (``"M:SS"`` left in the quarter) in its ``metadata``.
 """
 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import json
@@ -47,6 +62,7 @@ from aiohttp import ClientError, ClientResponseError, ClientSession
 _LOGGER = logging.getLogger(__name__)
 
 BASE_URL = "https://api.sleeper.app/v1"
+GRAPHQL_URL = "https://sleeper.com/graphql"
 AVATAR_URL = "https://sleepercdn.com/avatars"
 PLAYER_PICTURE_URL = (
     "https://sleepercdn.com/content/{sport}/players/thumb/{player_id}.jpg"
@@ -72,6 +88,33 @@ DRAFT_STATUS_COMPLETE = "complete"
 DRAFT_TYPE_SNAKE = "snake"
 DRAFT_TYPE_LINEAR = "linear"
 DRAFT_TYPE_AUCTION = "auction"
+
+# Game statuses; a game in any other status counts as not started.
+GAME_STATUS_PRE_GAME = "pre_game"
+GAME_STATUS_IN_GAME = "in_game"
+GAME_STATUS_COMPLETE = "complete"
+QUARTERS = 4
+QUARTER_LENGTH = timedelta(minutes=15)
+
+PROJECTIONS_QUERY = """
+query get_projections($sport: String!, $season: String!, $season_type: String!,
+                      $week: Int!, $player_ids: [String]) {
+  stats_for_players_in_week(sport: $sport, season: $season,
+                            season_type: $season_type, week: $week,
+                            category: "proj", player_ids: $player_ids) {
+    player_id team game_id stats
+  }
+}
+"""
+GAMES_QUERY = """
+query get_games($sport: String!, $season: String!, $season_type: String!,
+                $week: Int!) {
+  scores(sport: $sport, season: $season, season_type: $season_type,
+         week: $week) {
+    game_id status start_time metadata
+  }
+}
+"""
 
 
 class SleeperError(Exception):
@@ -160,6 +203,7 @@ class SleeperLeague:
     waiver_type: int
     waiver_budget: int
     scoring_type: str
+    scoring_settings: Mapping[str, float]
     roster_positions: tuple[str, ...]
     previous_league_id: str | None
     draft_id: str | None
@@ -183,6 +227,13 @@ class SleeperLeague:
             waiver_type=int(settings.get("waiver_type", WAIVER_TYPE_ROLLING)),
             waiver_budget=int(settings.get("waiver_budget", 0)),
             scoring_type=_scoring_type(scoring.get("rec")),
+            scoring_settings=MappingProxyType(
+                {
+                    str(key): float(value)
+                    for key, value in scoring.items()
+                    if isinstance(value, int | float)
+                }
+            ),
             roster_positions=_str_tuple(data.get("roster_positions")),
             previous_league_id=_optional_str(data.get("previous_league_id")),
             draft_id=_optional_str(data.get("draft_id")),
@@ -193,6 +244,24 @@ class SleeperLeague:
     def avatar_url(self) -> str | None:
         """Return the URL of the league's picture, if it has one."""
         return _avatar_url(self.avatar)
+
+    def fantasy_points(self, stats: Mapping[str, float]) -> float:
+        """Score a stat line with the league's scoring settings.
+
+        Projections lump field goals of 50+ yards together and leave out
+        missed field goals. Where the league does not score ``fgm_50p``
+        itself, the long ones count at the 50-59 yard rate, and the misses
+        are the attempts that were not made.
+        """
+        stats = dict(stats)
+        if "fgm_50p" not in self.scoring_settings and "fgm_50_59" not in stats:
+            stats["fgm_50_59"] = stats.get("fgm_50p", 0.0)
+        if "fgmiss" not in stats:
+            stats["fgmiss"] = max(stats.get("fga", 0.0) - stats.get("fgm", 0.0), 0.0)
+        return sum(
+            points * stats.get(key, 0.0)
+            for key, points in self.scoring_settings.items()
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -541,6 +610,100 @@ class SleeperTradedPick:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class SleeperProjection:
+    """A player's projected stat line for one week.
+
+    Score it with :meth:`SleeperLeague.fantasy_points`; the projected points
+    Sleeper includes (``pts_ppr`` etc.) only fit leagues with stock scoring.
+    """
+
+    player_id: str
+    team: str | None
+    game_id: str | None
+    stats: Mapping[str, float]
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> Self:
+        """Build a projection from an API response object."""
+        stats: dict[str, Any] = data.get("stats") or {}
+        return cls(
+            player_id=str(data["player_id"]),
+            team=data.get("team") or None,
+            game_id=_optional_str(data.get("game_id")),
+            stats=MappingProxyType(
+                {
+                    str(key): float(value)
+                    for key, value in stats.items()
+                    if isinstance(value, int | float)
+                }
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class SleeperGame:
+    """One game of a week and how far it has got.
+
+    ``clock`` is the time left in the current quarter, ``None`` before the
+    game.
+    """
+
+    game_id: str
+    status: str
+    start_time: datetime | None
+    home_team: str | None
+    away_team: str | None
+    quarter: int | None
+    clock: timedelta | None
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> Self:
+        """Build a game from an API response object."""
+        metadata: dict[str, Any] = data.get("metadata") or {}
+        return cls(
+            game_id=str(data["game_id"]),
+            status=data.get("status") or GAME_STATUS_PRE_GAME,
+            start_time=_timestamp(data.get("start_time")),
+            home_team=metadata.get("home_team") or None,
+            away_team=metadata.get("away_team") or None,
+            # An empty string before kickoff.
+            quarter=_optional_int(metadata.get("quarter_num") or None),
+            clock=_clock(metadata.get("time_remaining")),
+        )
+
+    @property
+    def teams(self) -> tuple[str, ...]:
+        """Return the abbreviations of the teams playing."""
+        return tuple(team for team in (self.away_team, self.home_team) if team)
+
+    @property
+    def remaining(self) -> float:
+        """Return the share of the game still to be played, from 1 to 0.
+
+        Overtime counts as over: what is left of it is too short to matter.
+        """
+        if self.status == GAME_STATUS_COMPLETE:
+            return 0.0
+        if self.status != GAME_STATUS_IN_GAME or self.quarter is None:
+            return 1.0
+        if self.quarter > QUARTERS:
+            return 0.0
+        left = (QUARTERS - self.quarter) * QUARTER_LENGTH + (self.clock or timedelta())
+        return max(0.0, min(1.0, left / (QUARTERS * QUARTER_LENGTH)))
+
+
+def _clock(value: Any) -> timedelta | None:
+    """Convert a game clock like ``"7:30"`` to the time it shows."""
+    if not isinstance(value, str):
+        return None
+    minutes, _, seconds = value.partition(":")
+    try:
+        return timedelta(minutes=int(minutes), seconds=int(seconds or 0))
+    except ValueError:
+        return None
+
+
 def _parse_players(text: str) -> dict[str, SleeperPlayer]:
     """Decode the player list. CPU heavy, meant to run in an executor."""
     data: dict[str, dict[str, Any]] = json.loads(text) or {}
@@ -629,10 +792,27 @@ class SleeperClient:
         not_found_statuses: tuple[int, ...] = (404,),
     ) -> bytes:
         """Perform a GET request and return the body."""
-        _LOGGER.debug("GET %s", url)
+        return await self._request(
+            "GET",
+            url,
+            request_timeout=request_timeout,
+            not_found_statuses=not_found_statuses,
+        )
+
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        payload: dict[str, Any] | None = None,
+        request_timeout: float | None = None,
+        not_found_statuses: tuple[int, ...] = (404,),
+    ) -> bytes:
+        """Perform a request and return the body."""
+        _LOGGER.debug("%s %s", method, url)
         try:
             async with asyncio.timeout(request_timeout or self._timeout):
-                response = await self._session.get(url)
+                response = await self._session.request(method, url, json=payload)
                 response.raise_for_status()
                 return await response.read()
         except ClientResponseError as err:
@@ -652,6 +832,23 @@ class SleeperClient:
     async def _get_list(self, path: str) -> list[dict[str, Any]]:
         """GET a list, treating a ``null`` answer as an empty list."""
         return await self._get(path) or []
+
+    async def _graphql_list(
+        self, query: str, field: str, variables: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """Run a GraphQL query and return the list in one of its fields.
+
+        GraphQL reports errors (a query that needs a login, for one) with
+        HTTP 200 and an ``errors`` list next to the data.
+        """
+        body = await self._request(
+            "POST", GRAPHQL_URL, payload={"query": query, "variables": variables}
+        )
+        data: dict[str, Any] = json.loads(body) or {}
+        if errors := data.get("errors"):
+            message = "; ".join(str(error.get("message")) for error in errors)
+            raise SleeperConnectionError(f"GraphQL error in {field}: {message}")
+        return (data.get("data") or {}).get(field) or []
 
     async def get_player_picture(self, player_id: str) -> tuple[bytes, str]:
         """Fetch a player's headshot and return it with its media type.
@@ -747,3 +944,40 @@ class SleeperClient:
         """Fetch the traded picks of a draft."""
         data = await self._get_list(f"draft/{draft_id}/traded_picks")
         return tuple(SleeperTradedPick.from_json(item) for item in data)
+
+    async def get_projections(
+        self, season: str, season_type: str, week: int, player_ids: Iterable[str]
+    ) -> dict[str, SleeperProjection]:
+        """Fetch the projections of some players for one week, keyed by player.
+
+        Players without a projection (on a bye, for one) are left out.
+        """
+        data = await self._graphql_list(
+            PROJECTIONS_QUERY,
+            "stats_for_players_in_week",
+            {
+                "sport": self._sport,
+                "season": season,
+                "season_type": season_type,
+                "week": week,
+                "player_ids": list(player_ids),
+            },
+        )
+        projections = (SleeperProjection.from_json(item) for item in data)
+        return {projection.player_id: projection for projection in projections}
+
+    async def get_games(
+        self, season: str, season_type: str, week: int
+    ) -> tuple[SleeperGame, ...]:
+        """Fetch the games of one week with their live state."""
+        data = await self._graphql_list(
+            GAMES_QUERY,
+            "scores",
+            {
+                "sport": self._sport,
+                "season": season,
+                "season_type": season_type,
+                "week": week,
+            },
+        )
+        return tuple(SleeperGame.from_json(item) for item in data)

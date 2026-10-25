@@ -16,11 +16,13 @@ from custom_components.sleeper.api import (
     SleeperConnectionError,
     SleeperDraft,
     SleeperDraftPick,
+    SleeperGame,
     SleeperLeague,
     SleeperLeagueUser,
     SleeperMatchup,
     SleeperNotFoundError,
     SleeperPlayer,
+    SleeperProjection,
     SleeperRoster,
     SleeperSportState,
     SleeperTradedPick,
@@ -28,8 +30,10 @@ from custom_components.sleeper.api import (
 from custom_components.sleeper.const import (
     DRAFT_START_GRACE_PERIOD,
     DRAFT_UPDATE_INTERVAL,
+    GAMES_REFRESH_INTERVAL,
     IDLE_OFFSEASON_UPDATE_INTERVAL,
     IDLE_SEASON_UPDATE_INTERVAL,
+    KICKOFF_GRACE_PERIOD,
     LEAGUE_REFRESH_INTERVAL,
     LIVE_GRACE_PERIOD,
     LIVE_UPDATE_INTERVAL,
@@ -37,6 +41,7 @@ from custom_components.sleeper.const import (
 from custom_components.sleeper.coordinator import (
     SleeperCoordinator,
     SleeperLeagueData,
+    SleeperOutlook,
     SleeperStarter,
 )
 
@@ -50,8 +55,17 @@ from .conftest import (
     draft_for,
     draft_picks_for,
     drafting_picks,
+    games_fixture,
     matchups_for,
 )
+
+
+@pytest.fixture
+def games_over(mock_client: MagicMock) -> None:
+    """Report every game of the week as over, so no game drives the interval."""
+    mock_client.get_games.return_value = tuple(
+        replace(game, status="complete") for game in games_fixture()
+    )
 
 
 @pytest.fixture
@@ -70,6 +84,7 @@ def _matchups_with_points(points: float) -> tuple[SleeperMatchup, ...]:
     )
 
 
+@pytest.mark.usefixtures("games_over")
 async def test_data(
     hass: HomeAssistant, init_integration: MockConfigEntry, mock_client: MagicMock
 ) -> None:
@@ -285,7 +300,7 @@ def test_opponent_without_owner() -> None:
     assert data.opponent_matchup is None
 
 
-@pytest.mark.usefixtures("no_running_draft")
+@pytest.mark.usefixtures("games_over", "no_running_draft")
 async def test_adaptive_interval(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -680,6 +695,7 @@ async def test_draft_requests(
     ]
 
 
+@pytest.mark.usefixtures("games_over")
 async def test_league_without_draft(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
@@ -706,6 +722,7 @@ async def test_league_without_draft(
     assert coordinator.update_interval == IDLE_SEASON_UPDATE_INTERVAL
 
 
+@pytest.mark.usefixtures("games_over")
 async def test_draft_interval(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
@@ -760,6 +777,7 @@ async def test_draft_interval(
     mock_client.get_draft_traded_picks.assert_not_awaited()
 
 
+@pytest.mark.usefixtures("games_over")
 async def test_scheduled_draft_interval(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
@@ -803,3 +821,426 @@ async def test_scheduled_draft_interval(
     # Long after the scheduled start: give up, idle interval.
     await async_poll(hass, freezer, DRAFT_START_GRACE_PERIOD)
     assert coordinator.update_interval == IDLE_SEASON_UPDATE_INTERVAL
+
+
+async def test_projections(
+    hass: HomeAssistant, init_integration: MockConfigEntry, mock_client: MagicMock
+) -> None:
+    """Test the matchup is projected from the starters and the game clock."""
+    data = init_integration.runtime_data.data
+    wombats = data.leagues[LEAGUE_ID]
+
+    # Mine: Taylor (IND) and the two BAL starters are in the third quarter,
+    # Kelce (KC) has not played yet.
+    assert wombats.my_outlook == SleeperOutlook(
+        points=71.66,
+        remaining=21.09,
+        projection=109.15,
+        yet_to_play=1,
+        playing=3,
+    )
+    assert wombats.my_outlook.projected == 92.75
+    # The opponent's two NYJ starters have not played yet.
+    assert wombats.opponent_outlook == SleeperOutlook(
+        points=35.9,
+        remaining=26.72,
+        projection=109.12,
+        yet_to_play=2,
+        playing=0,
+    )
+    assert wombats.win_probability == 98.7
+    assert data.leagues[PREDRAFT_LEAGUE_ID].my_outlook is None
+    assert data.leagues[PREDRAFT_LEAGUE_ID].win_probability is None
+
+    # One request each for the starters of both sides, in all leagues.
+    starters = {
+        player_id
+        for matchup in (wombats.my_matchup, wombats.opponent_matchup)
+        if matchup is not None
+        for player_id in matchup.starters
+    }
+    mock_client.get_projections.assert_awaited_once_with(
+        "2026", "regular", 1, sorted(starters)
+    )
+    mock_client.get_games.assert_awaited_once_with("2026", "regular", 1)
+
+
+@pytest.mark.usefixtures("no_running_draft")
+async def test_projections_failure_and_recovery(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test failing projections leave the rest of the poll intact."""
+    coordinator: SleeperCoordinator = init_integration.runtime_data
+
+    mock_client.get_games.side_effect = SleeperConnectionError("graphql down")
+    for _ in range(2):
+        await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    assert coordinator.last_update_success is True
+    wombats = coordinator.data.leagues[LEAGUE_ID]
+    assert wombats.my_matchup is not None
+    assert wombats.my_outlook is None
+    assert wombats.win_probability is None
+    assert caplog.text.count("Could not load the Sleeper projections") == 1
+    state = hass.states.get("sensor.wombats_league_win_probability")
+    assert state is not None
+    assert state.state == "unknown"
+
+    mock_client.get_games.side_effect = None
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    assert "Sleeper projections are available again" in caplog.text
+    assert coordinator.data.leagues[LEAGUE_ID].win_probability == 98.7
+
+
+async def test_no_projections_without_matchup(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_client: MagicMock,
+) -> None:
+    """Test nothing is projected when the account plays no matchup."""
+    mock_client.get_matchups.side_effect = None
+    mock_client.get_matchups.return_value = ()
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    mock_client.get_projections.assert_not_awaited()
+    mock_client.get_games.assert_not_awaited()
+    assert mock_config_entry.runtime_data.data.leagues[LEAGUE_ID].my_outlook is None
+
+
+def _game(
+    game_id: str, status: str, teams: tuple[str, str], quarter: int = 0
+) -> SleeperGame:
+    """Return a game between two teams."""
+    return SleeperGame.from_json(
+        {
+            "game_id": game_id,
+            "status": status,
+            "metadata": {
+                "away_team": teams[0],
+                "home_team": teams[1],
+                "quarter_num": quarter,
+                "time_remaining": "15:00",
+            },
+        }
+    )
+
+
+def _projected_league(
+    starters: dict[int, list[str]],
+    points: dict[int, float],
+    projections: dict[str, tuple[str, float]],
+    games: tuple[SleeperGame, ...],
+) -> SleeperLeagueData:
+    """Return a two-team matchup with rushing-yard projections.
+
+    ``projections`` maps a player to their team and projected points, scored
+    at 0.1 points per rushing yard by the fixture league.
+    """
+    matchups = tuple(
+        SleeperMatchup.from_json(
+            {
+                "roster_id": roster_id,
+                "matchup_id": 1,
+                "points": points[roster_id],
+                "starters": ids,
+            }
+        )
+        for roster_id, ids in starters.items()
+    )
+    data = _league_data((_roster(1, "a"), _roster(2, "b")), matchups)
+    league = replace(data.league, scoring_settings={"rush_yd": 0.1})
+    return replace(
+        data,
+        league=league,
+        projections={
+            player_id: SleeperProjection.from_json(
+                {
+                    "player_id": player_id,
+                    "team": team,
+                    "stats": {"rush_yd": projected * 10},
+                }
+            )
+            for player_id, (team, projected) in projections.items()
+        },
+        games={team: game for game in games for team in game.teams},
+        player_lookup={
+            "nobody": SleeperPlayer.from_json({"player_id": "nobody", "team": "BUF"}),
+        }.get,
+    )
+
+
+def test_outlook_edge_cases() -> None:
+    """Test empty slots, byes, players without projection or game."""
+    data = _projected_league(
+        starters={1: ["0", "bye", "nobody", "lost", "a1"], 2: ["b1"]},
+        points={1: 10, 2: 20},
+        projections={"lost": ("XYZ", 5), "a1": ("KC", 12), "b1": ("BUF", 8)},
+        games=(
+            _game("1", "in_game", ("KC", "DEN"), quarter=3),
+            _game("2", "in_game", ("BUF", "MIA"), quarter=2),
+        ),
+    )
+
+    # Empty slot and bye are skipped. "nobody" has no projection but plays
+    # for BUF (from the player list); "lost" plays for a team without a game
+    # and counts as not started.
+    assert data.my_outlook == SleeperOutlook(
+        points=10,
+        remaining=5 + 12 * 0.5,
+        projection=17,
+        yet_to_play=1,
+        playing=2,
+    )
+    assert data.opponent_outlook == SleeperOutlook(
+        points=20, remaining=6, projection=8, yet_to_play=0, playing=1
+    )
+    # 21 vs 26 projected, 17 of 25 projected points still to come.
+    assert data.win_probability == 41.7
+
+
+@pytest.mark.parametrize(
+    ("points", "win_probability"),
+    [((30, 20), 100), ((20, 30), 0), ((25, 25), 50)],
+)
+def test_win_probability_when_all_games_are_over(
+    points: tuple[float, float], win_probability: float
+) -> None:
+    """Test the matchup is decided once no projected points are left."""
+    data = _projected_league(
+        starters={1: ["a1"], 2: ["b1", "b2"]},
+        points={1: points[0], 2: points[1]},
+        projections={"a1": ("KC", 12), "b1": ("BUF", 8)},
+        games=(
+            _game("1", "complete", ("KC", "DEN")),
+            _game("2", "complete", ("BUF", "MIA")),
+        ),
+    )
+
+    assert data.win_probability == win_probability
+
+
+def test_win_probability_without_projections() -> None:
+    """Test a matchup nobody projected points for is decided by the score."""
+    data = _projected_league(
+        starters={1: ["a1"], 2: ["b1"]},
+        points={1: 3, 2: 0},
+        projections={},
+        games=(),
+    )
+
+    assert data.win_probability == 100
+
+
+def _games(
+    now: datetime, changes: dict[str, tuple[str, timedelta]]
+) -> tuple[SleeperGame, ...]:
+    """Return the fixture games, all over except some with a status and kickoff.
+
+    ``changes`` maps a game ID to its status and its kickoff relative to now.
+    """
+    return tuple(
+        replace(
+            game,
+            status=changes[game.game_id][0],
+            start_time=now + changes[game.game_id][1],
+        )
+        if game.game_id in changes
+        else replace(game, status="complete")
+        for game in games_fixture()
+    )
+
+
+# Kelce's (mine) game, the game of the opponent's two NYJ starters, and a
+# game without a starter of the matchup.
+MY_GAME = "202610116"
+OPPONENT_GAME = "202610134"
+OTHER_GAME = "202610123"
+
+
+@pytest.mark.usefixtures("no_running_draft")
+async def test_interval_follows_games(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test the games of the matchup's starters drive the interval."""
+    coordinator: SleeperCoordinator = init_integration.runtime_data
+    # The fixture has my starters in a running game.
+    assert coordinator.update_interval == LIVE_UPDATE_INTERVAL
+    games = coordinator.data.leagues[LEAGUE_ID].matchup_games
+    assert [game.game_id for game in games] == sorted(game.game_id for game in games)
+    assert OTHER_GAME not in {game.game_id for game in games}
+
+    async def poll(changes: dict[str, tuple[str, timedelta]]) -> timedelta:
+        # A poll an hour later always requests the games again. Kickoffs are
+        # relative to that poll.
+        mock_client.get_games.return_value = _games(
+            dt_util.utcnow() + GAMES_REFRESH_INTERVAL, changes
+        )
+        await async_poll(hass, freezer, GAMES_REFRESH_INTERVAL)
+        assert coordinator.update_interval is not None
+        return coordinator.update_interval
+
+    # Only the opponent has starters in the running game: still live.
+    assert await poll({OPPONENT_GAME: ("in_game", -timedelta(hours=1))}) == (
+        LIVE_UPDATE_INTERVAL
+    )
+    # A running game without starters of the matchup does not count.
+    assert await poll({OTHER_GAME: ("in_game", -timedelta(hours=1))}) == (
+        IDLE_SEASON_UPDATE_INTERVAL
+    )
+    # The next kickoff pulls the poll forward, a far one does not.
+    assert await poll({MY_GAME: ("pre_game", timedelta(minutes=10))}) == timedelta(
+        minutes=10
+    )
+    assert await poll({MY_GAME: ("pre_game", timedelta(days=3))}) == (
+        IDLE_SEASON_UPDATE_INTERVAL
+    )
+    # Right before kickoff the poll is not scheduled closer than live.
+    assert await poll({MY_GAME: ("pre_game", timedelta(seconds=5))}) == (
+        LIVE_UPDATE_INTERVAL
+    )
+    # Past kickoff but not marked as started yet: live for a while.
+    assert await poll({MY_GAME: ("pre_game", -timedelta(minutes=5))}) == (
+        LIVE_UPDATE_INTERVAL
+    )
+    assert await poll(
+        {MY_GAME: ("pre_game", -KICKOFF_GRACE_PERIOD - timedelta(minutes=1))}
+    ) == (IDLE_SEASON_UPDATE_INTERVAL)
+    # A game without a kickoff time cannot pull the poll forward.
+    mock_client.get_games.return_value = tuple(
+        replace(game, start_time=None) if game.game_id == MY_GAME else game
+        for game in _games(dt_util.utcnow(), {MY_GAME: ("pre_game", timedelta())})
+    )
+    await async_poll(hass, freezer, GAMES_REFRESH_INTERVAL)
+    assert coordinator.update_interval == IDLE_SEASON_UPDATE_INTERVAL
+
+
+@pytest.mark.usefixtures("games_over", "no_running_draft")
+async def test_other_matchups_do_not_go_live(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test points of other teams' matchups do not switch to live."""
+    coordinator: SleeperCoordinator = init_integration.runtime_data
+    assert coordinator.update_interval == IDLE_SEASON_UPDATE_INTERVAL
+
+    mock_client.get_matchups.side_effect = lambda league_id, week: tuple(
+        replace(matchup, points=99.0) if matchup.roster_id == 3 else matchup
+        for matchup in matchups_for(league_id, week)
+    )
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    assert coordinator.update_interval == IDLE_SEASON_UPDATE_INTERVAL
+
+    # The opponent's points do.
+    mock_client.get_matchups.side_effect = lambda league_id, week: tuple(
+        replace(matchup, points=99.0) if matchup.roster_id in {3, 5} else matchup
+        for matchup in matchups_for(league_id, week)
+    )
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    assert coordinator.update_interval == LIVE_UPDATE_INTERVAL
+
+
+@pytest.mark.usefixtures("no_running_draft")
+async def test_projection_and_game_requests(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test projections and games are only requested when they can change."""
+    kickoff = dt_util.utcnow() + timedelta(hours=1, minutes=5)
+    mock_client.get_games.return_value = _games(
+        dt_util.utcnow(),
+        {
+            MY_GAME: ("pre_game", kickoff - dt_util.utcnow()),
+            OPPONENT_GAME: ("pre_game", timedelta(days=1)),
+        },
+    )
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    coordinator: SleeperCoordinator = mock_config_entry.runtime_data
+    wombats = coordinator.data.leagues[LEAGUE_ID]
+    starters = sorted(
+        {
+            *(wombats.my_matchup.starters if wombats.my_matchup else ()),
+            *(wombats.opponent_matchup.starters if wombats.opponent_matchup else ()),
+        }
+    )
+    yet_to_play = ["1466", "8146", "8155"]  # Kelce (KC), Wilson, Hall (NYJ)
+    projections = mock_client.get_projections
+    games = mock_client.get_games
+    assert projections.await_args_list == [call("2026", "regular", 1, starters)]
+    assert games.await_count == 1
+
+    # Nothing is running: no requests.
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    assert projections.await_count == 1
+    assert games.await_count == 1
+    assert coordinator.data.leagues[LEAGUE_ID].win_probability is not None
+
+    # A new starter is requested right away, and only that one.
+    mock_client.get_matchups.side_effect = lambda league_id, week: tuple(
+        replace(matchup, starters=("4984", *matchup.starters[1:]))
+        if matchup.roster_id == 5
+        else matchup
+        for matchup in matchups_for(league_id, week)
+    )
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    assert projections.await_args == call("2026", "regular", 1, ["4984"])
+    assert games.await_count == 1
+
+    # An hour after the first request, the players yet to play and the games
+    # are requested again; the opponent's benched QB is not.
+    for _ in range(2):
+        await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    assert projections.await_args == call(
+        "2026", "regular", 1, sorted(["4984", *yet_to_play])
+    )
+    assert projections.await_count == 3
+    assert games.await_count == 2
+
+    # The kickoff of Kelce's game pulls the poll forward and requests the
+    # projections of everybody yet to play once more.
+    assert coordinator.update_interval == kickoff - dt_util.utcnow()
+    mock_client.get_games.return_value = _games(
+        kickoff,
+        {
+            MY_GAME: ("in_game", timedelta()),
+            OPPONENT_GAME: ("pre_game", timedelta(days=1)),
+        },
+    )
+    await async_poll(hass, freezer, kickoff - dt_util.utcnow())
+    assert projections.await_count == 4
+    assert games.await_count == 3
+    assert coordinator.update_interval == LIVE_UPDATE_INTERVAL
+
+    # While the game runs, the games are requested every poll; Kelce's
+    # projection does not change any more.
+    await async_poll(hass, freezer, LIVE_UPDATE_INTERVAL)
+    assert projections.await_count == 4
+    assert games.await_count == 4
+
+    # A full refresh skips him from now on.
+    await async_poll(hass, freezer, timedelta(hours=1))
+    assert projections.await_args == call(
+        "2026", "regular", 1, sorted(["4984", "8146", "8155"])
+    )
+
+    # A new week starts from scratch.
+    mock_client.get_sport_state.return_value = replace(
+        mock_client.get_sport_state.return_value, week=2
+    )
+    await async_poll(hass, freezer, LIVE_UPDATE_INTERVAL)
+    assert projections.await_args is not None
+    assert projections.await_args.args[2] == 2
+    assert len(projections.await_args.args[3]) == len(starters)

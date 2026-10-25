@@ -13,6 +13,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
+from homeassistant.const import PERCENTAGE
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
@@ -29,6 +30,7 @@ from .coordinator import (
     SleeperConfigEntry,
     SleeperCoordinator,
     SleeperLeagueData,
+    SleeperOutlook,
     SleeperUpcomingPick,
 )
 from .entity import SleeperLeagueEntity
@@ -90,6 +92,35 @@ def _starters_out_attributes(data: SleeperLeagueData) -> dict[str, Any]:
             for starter in data.starters_out
         ],
     }
+
+
+def _outlook_value(
+    outlook_fn: Callable[[SleeperLeagueData], SleeperOutlook | None],
+) -> Callable[[SleeperLeagueData], StateType]:
+    """Return the projected final points of one side of the matchup."""
+
+    def value(data: SleeperLeagueData) -> StateType:
+        return None if (outlook := outlook_fn(data)) is None else outlook.projected
+
+    return value
+
+
+def _outlook_attributes(
+    outlook_fn: Callable[[SleeperLeagueData], SleeperOutlook | None],
+) -> Callable[[SleeperLeagueData], dict[str, Any]]:
+    """Return what one side of the matchup still has to come."""
+
+    def attributes(data: SleeperLeagueData) -> dict[str, Any]:
+        if (outlook := outlook_fn(data)) is None:
+            return {}
+        return {
+            "remaining_points": outlook.remaining,
+            "pregame_projection": outlook.projection,
+            "starters_yet_to_play": outlook.yet_to_play,
+            "starters_playing": outlook.playing,
+        }
+
+    return attributes
 
 
 def _opponent_attributes(data: SleeperLeagueData) -> dict[str, Any]:
@@ -328,6 +359,33 @@ LEAGUE_SENSORS: tuple[SleeperLeagueSensorEntityDescription, ...] = (
             None if data.opponent_matchup is None else data.opponent_matchup.points
         ),
         entity_picture_fn=_opponent_picture,
+    ),
+    SleeperLeagueSensorEntityDescription(
+        key="projected_points",
+        translation_key="projected_points",
+        native_unit_of_measurement=UNIT_POINTS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=_outlook_value(lambda data: data.my_outlook),
+        attributes_fn=_outlook_attributes(lambda data: data.my_outlook),
+    ),
+    SleeperLeagueSensorEntityDescription(
+        key="opponent_projected_points",
+        translation_key="opponent_projected_points",
+        native_unit_of_measurement=UNIT_POINTS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=_outlook_value(lambda data: data.opponent_outlook),
+        attributes_fn=_outlook_attributes(lambda data: data.opponent_outlook),
+        entity_picture_fn=_opponent_picture,
+    ),
+    SleeperLeagueSensorEntityDescription(
+        key="win_probability",
+        translation_key="win_probability",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value_fn=lambda data: data.win_probability,
     ),
     SleeperLeagueSensorEntityDescription(
         key="opponent",

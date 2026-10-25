@@ -13,8 +13,9 @@ tablet, or flash the lights when you take the lead.
 It is an unofficial, community-built integration and is not made, endorsed or supported by
 Sleeper — see [Disclaimer](#disclaimer).
 
-> **Status:** early development. Standings, live matchup scores with player names, scoring
-> events, waiver information and slow drafts of all your leagues are available;
+> **Status:** early development. Standings, live matchup scores with player names,
+> projections and win probability, scoring events, waiver information and slow drafts of
+> all your leagues are available;
 > transactions and playoffs are planned.
 
 ## Prerequisites
@@ -87,6 +88,9 @@ the account device; they are removed on update.)
 | Matchup points | Your live points in this week's matchup. Attributes: week, matchup ID, and your starters with slot, name and points. |
 | Starters out | Number of your starters not expected to play: injury status Out, Doubtful, IR, PUP, suspended or similar, inactive players, and empty slots. Attribute: the affected starters with slot and reason. Questionable players are not counted. |
 | Opponent points | Your opponent's live points. |
+| Projected points | The points you are projected to end the week with: your live points plus what your starters are still expected to score (see below). Attributes: remaining points, pre-game projection of the whole line-up, starters yet to play, starters playing. |
+| Opponent projected points | The same for your opponent. |
+| Win probability | Your chance to win this week's matchup, in percent. |
 | Opponent | Your opponent's team name (or display name). Attributes: roster ID, record. |
 | Last big play | The player of the latest big play in your matchup (see below), with the player's picture. Attributes: player ID, position, team, whether the player is yours, previous points, points, change, week. `unknown` until the first big play after a restart. |
 | Waiver position | Your position in the waiver order. |
@@ -112,14 +116,36 @@ the two points sensors:
    > states('sensor.wombats_league_opponent_points') | float(0) }}
 ```
 
-**Team** shows your team's picture instead of its icon, **Opponent** and **Opponent
-points** your opponent's, **Last big play** the player's headshot (the team logo for a
+**Team** shows your team's picture instead of its icon, **Opponent**, **Opponent
+points** and **Opponent projected points** your opponent's, **Last big play** the player's headshot (the team logo for a
 defense). A team picture uploaded for the league is preferred over the
 manager's profile picture; without either, the icon stays. Your browser or the companion app loads
 team pictures and logos directly from Sleeper's image server. Player headshots are wide, so
 Home Assistant fetches them and serves them cropped to a square
 (`/api/sleeper/player_picture/…`); otherwise the round badge shows the head off to the side.
 Changed pictures show up with the hourly refresh of the league list.
+
+### Projections and win probability
+
+The Sleeper app computes its matchup projection and win probability itself; the API only
+has each player's projected stats for the week (by Rotowire). The integration does the same
+math:
+
+- Each starter's projected stats are scored with your league's scoring settings, so the
+  projection matches your league's format, not just PPR or half PPR.
+- Projections are pre-game values and do not change during a game. A starter still adds
+  their projection times the share of their game that is left (from the game clock): all of
+  it before kickoff, half of it at halftime, nothing once the game is over.
+- The final margin is treated as a normal distribution around the projected margin, with
+  a standard deviation of 29 points before kickoff (backtested on a 12-team half-PPR
+  league) that shrinks as the games are played. Once every game is over the probability
+  is 0 or 100 %.
+
+On a live game day the numbers were within two points and two percentage points of the
+Sleeper app, which uses its own, unpublished model. Projections and the game clock come from the
+GraphQL API the Sleeper app uses; it needs no login but is not documented and may change.
+If it fails, the three entities are `unknown` until the next successful update; everything
+else keeps working.
 
 ### Big plays: trigger, events and the activity feed
 
@@ -242,10 +268,16 @@ The integration polls the Sleeper API and adapts the interval to what is happeni
 
 | Situation | Interval |
 |---|---|
-| Matchup points changed or a draft pick was made within the last 30 minutes | 60 seconds |
+| A game is running in which a starter of your matchup plays (yours or your opponent's) | 60 seconds |
+| Points in your matchup changed or a draft pick was made within the last 30 minutes | 60 seconds |
 | A draft is running, nobody has picked for 30 minutes | 5 minutes |
 | Regular or post season, no points changing | 15 minutes |
 | Pre-season and off-season | 60 minutes |
+
+The next kickoff of a game with a starter of your matchup pulls the next update forward to
+the kickoff time; Sleeper publishes the exact kickoff times weeks in advance. Games in which
+neither you nor your opponent has a starter, and the other matchups of the league, cause no
+extra updates.
 
 A scheduled draft pulls the next update forward to its start time, and for six hours after
 a scheduled start that the commissioner has not started yet the 5 minute interval applies.
@@ -256,6 +288,16 @@ change the intervals; if you need an update right now, call the `homeassistant.u
 action on any Sleeper entity.
 
 Each update requests the rosters of every league and the matchups of the leagues in season.
+While you play a matchup, the projections of the starters on both sides (for all leagues at
+once) and the state of the week's NFL games are requested too, but only when they can have
+changed, because these requests are not cached by Sleeper's servers:
+
+- The game clock every update while a game with a starter of your matchup is running, and
+  otherwise once an hour, to follow changes of the kickoff times.
+- A projection no longer changes once the player's game has started. The others are
+  requested again once an hour (Sleeper updates them about that often) and at every kickoff
+  of a game in your matchup, which picks up players ruled out shortly before. A starter new
+  to a line-up is requested right away.
 Draft data is only requested while it can change: a league whose draft has not started
 gets one request per update (to notice the start), a league that is drafting three (the
 draft, its picks and its traded picks), and a league whose draft is finished none at all.
@@ -270,11 +312,12 @@ hour later.
 ## Known limitations
 
 - Only NFL leagues are supported.
-- The Sleeper API does not publish the NFL schedule, so the first score change of a game
-  day is noticed at the idle interval (up to 15 minutes late). After that, updates run every
-  60 seconds until scores stop changing.
-- A win probability like the one in the Sleeper app is not available: Sleeper does not
-  publish it.
+- Kickoff times and the game clock come from the GraphQL API the Sleeper app uses, which
+  is not documented. If it fails, the first score change of a game day is noticed at the
+  idle interval (up to 15 minutes late); after that, updates run every 60 seconds until
+  scores stop changing.
+- Projections and win probability are the integration's own calculation and can differ a
+  little from the Sleeper app.
 - Fast drafts (pick clocks of a minute or two) cannot be followed in time because of the
   60 second cache, see the Drafts section.
 - Transactions and playoff brackets are planned for a later release.

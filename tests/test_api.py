@@ -15,6 +15,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 
 from custom_components.sleeper.api import (
     BASE_URL,
+    GRAPHQL_URL,
     PNG_SIGNATURE,
     WAIVER_TYPE_FAAB,
     WAIVER_TYPE_ROLLING,
@@ -22,6 +23,7 @@ from custom_components.sleeper.api import (
     SleeperConnectionError,
     SleeperDraft,
     SleeperDraftPick,
+    SleeperGame,
     SleeperLeague,
     SleeperLeagueUser,
     SleeperMatchup,
@@ -744,3 +746,214 @@ async def test_get_draft_traded_picks(
     assert trades[0].roster_id == 1
     assert trades[0].owner_id == 11
     assert trades[0].previous_owner_id == 1
+
+
+# Kicker projection as Sleeper delivers it: long field goals as fgm_50p,
+# no fgmiss.
+KICKER_PROJECTION = {
+    "fga": 2.29,
+    "fgm": 1.93,
+    "fgm_20_29": 0.43,
+    "fgm_30_39": 0.57,
+    "fgm_40_49": 0.64,
+    "fgm_50p": 0.21,
+    "fgm_yds": 77.07,
+    "fgmiss_50p": 0.18,
+    "pts_half_ppr": 9.09,
+    "xpa": 2.72,
+    "xpm": 2.58,
+    "xpmiss": 0.14,
+}
+
+
+def _wombats() -> SleeperLeague:
+    """Return the fixture league with its full scoring settings."""
+    return next(
+        SleeperLeague.from_json(item)
+        for item in load_json_fixture("leagues.json")
+        if item["league_id"] == LEAGUE_ID
+    )
+
+
+def test_league_fantasy_points() -> None:
+    """Test stat lines are scored with the league's settings."""
+    league = _wombats()
+    assert league.scoring_settings["rec"] == 0.5
+    assert league.scoring_settings["pass_yd"] == 0.04
+
+    # 250 yards, 2 TDs, 1 INT passing; 20 rushing yards. The stock points
+    # Sleeper includes are ignored.
+    assert league.fantasy_points(
+        {"pass_yd": 250, "pass_td": 2, "pass_int": 1, "rush_yd": 20, "pts_ppr": 99}
+    ) == pytest.approx(19)
+    # Half a point per reception.
+    assert league.fantasy_points({"rec": 6, "rec_yd": 80}) == pytest.approx(11)
+    # Long field goals count at the 50-59 rate, misses are attempts not made:
+    # 3 * (0.43 + 0.57) + 4 * 0.64 + 5 * 0.21 + 2.58 - 0.14 - (2.29 - 1.93).
+    assert league.fantasy_points(KICKER_PROJECTION) == pytest.approx(8.69)
+    # Real stats have the league's own keys and are taken as they are.
+    assert league.fantasy_points(
+        {"fgm_50_59": 1, "fgm_50p": 1, "fgmiss": 1, "fga": 4, "fgm": 1}
+    ) == pytest.approx(4)
+    assert league.fantasy_points({}) == 0
+
+
+def test_league_scoring_long_field_goals_itself() -> None:
+    """Test a league scoring fgm_50p does not count long kicks twice."""
+    league = SleeperLeague.from_json(
+        {
+            "league_id": 1,
+            "name": "L",
+            "status": "in_season",
+            "season": 2026,
+            "sport": "nfl",
+            "total_rosters": 10,
+            "scoring_settings": {
+                "fgm_50p": 5,
+                "fgm_50_59": 4,
+                "fgmiss": -1,
+                "note": "ignored",
+            },
+        }
+    )
+
+    assert "note" not in league.scoring_settings
+    assert league.fantasy_points({"fgm_50p": 1, "fga": 2, "fgm": 1}) == 4
+
+
+async def test_get_projections(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test fetching the projections of some players."""
+    aioclient_mock.post(GRAPHQL_URL, json=load_json_fixture("projections_1.json"))
+
+    projections = await client.get_projections("2026", "regular", 1, ["PIT", "6083"])
+
+    assert len(projections) == 18
+    defense = projections["PIT"]
+    assert defense.team == "PIT"
+    assert defense.game_id == "202610128"
+    assert defense.stats["sack"] > 0
+    caleb = projections["11560"]
+    assert caleb.team == "CHI"
+    assert caleb.stats["pass_yd"] > 0
+    with pytest.raises(TypeError):
+        caleb.stats["x"] = 1  # type: ignore[index]
+
+    _, url, payload, _ = aioclient_mock.mock_calls[0]
+    assert str(url) == GRAPHQL_URL
+    assert "stats_for_players_in_week" in payload["query"]
+    assert payload["variables"] == {
+        "sport": "nfl",
+        "season": "2026",
+        "season_type": "regular",
+        "week": 1,
+        "player_ids": ["PIT", "6083"],
+    }
+
+
+async def test_get_games(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test fetching the games of a week."""
+    aioclient_mock.post(GRAPHQL_URL, json=load_json_fixture("scores_1.json"))
+
+    games = {game.game_id: game for game in await client.get_games("2026", "post", 1)}
+
+    assert len(games) == 16
+    running = games["202610114"]
+    assert running.status == "in_game"
+    assert running.teams == ("BAL", "IND")
+    assert running.quarter == 3
+    assert running.clock == timedelta(minutes=7, seconds=30)
+    assert running.remaining == 0.375
+    assert running.start_time == datetime(2026, 9, 13, 17, 0, tzinfo=UTC)
+    upcoming = games["202610116"]
+    assert upcoming.status == "pre_game"
+    assert upcoming.quarter is None
+    assert upcoming.clock is None
+    assert upcoming.remaining == 1
+    assert games["202610105"].remaining == 0
+
+    _, _, payload, _ = aioclient_mock.mock_calls[0]
+    assert "scores" in payload["query"]
+    assert payload["variables"] == {
+        "sport": "nfl",
+        "season": "2026",
+        "season_type": "post",
+        "week": 1,
+    }
+
+
+@pytest.mark.parametrize(
+    ("data", "remaining"),
+    [
+        ({"status": "in_game", "metadata": {"quarter_num": 1}}, 0.75),
+        (
+            {
+                "status": "in_game",
+                "metadata": {"quarter_num": 4, "time_remaining": "0:30"},
+            },
+            0.5 / 60,
+        ),
+        ({"status": "in_game", "metadata": {"quarter_num": 5}}, 0),
+        ({"status": "in_game", "metadata": {"time_remaining": "12:00"}}, 1),
+        (
+            {
+                "status": "in_game",
+                "metadata": {"quarter_num": 2, "time_remaining": "HALF"},
+            },
+            0.5,
+        ),
+        (
+            {
+                "status": "in_game",
+                "metadata": {"quarter_num": 1, "time_remaining": "99"},
+            },
+            1,
+        ),
+        ({"status": "postponed"}, 1),
+        ({}, 1),
+    ],
+)
+def test_game_remaining(data: dict[str, object], remaining: float) -> None:
+    """Test the share of a game left from its status and clock."""
+    game = SleeperGame.from_json({"game_id": "1", **data})
+
+    assert game.remaining == pytest.approx(remaining)
+    assert game.teams == ()
+
+
+async def test_graphql_errors(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test GraphQL errors map to connection errors."""
+    aioclient_mock.post(
+        GRAPHQL_URL,
+        json={
+            "data": {"scores": None},
+            "errors": [{"code": "unauthorized", "message": "Unauthorized"}],
+        },
+    )
+
+    with pytest.raises(SleeperConnectionError, match="Unauthorized"):
+        await client.get_games("2026", "regular", 1)
+
+
+async def test_graphql_null_data(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test a GraphQL answer without data is an empty result."""
+    aioclient_mock.post(GRAPHQL_URL, json={"data": {"stats_for_players_in_week": None}})
+
+    assert await client.get_projections("2026", "regular", 1, []) == {}
+
+
+async def test_graphql_http_error(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test an HTTP error of the GraphQL API maps to a connection error."""
+    aioclient_mock.post(GRAPHQL_URL, status=502)
+
+    with pytest.raises(SleeperConnectionError):
+        await client.get_games("2026", "regular", 1)

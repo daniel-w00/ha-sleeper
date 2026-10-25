@@ -106,6 +106,43 @@
       "opponent_points": {
         "name": "Opponent points"
       },
+      "projected_points": {
+        "name": "Projected points",
+        "state_attributes": {
+          "remaining_points": {
+            "name": "Remaining points"
+          },
+          "pregame_projection": {
+            "name": "Pre-game projection"
+          },
+          "starters_yet_to_play": {
+            "name": "Starters yet to play"
+          },
+          "starters_playing": {
+            "name": "Starters playing"
+          }
+        }
+      },
+      "opponent_projected_points": {
+        "name": "Opponent projected points",
+        "state_attributes": {
+          "remaining_points": {
+            "name": "Remaining points"
+          },
+          "pregame_projection": {
+            "name": "Pre-game projection"
+          },
+          "starters_yet_to_play": {
+            "name": "Starters yet to play"
+          },
+          "starters_playing": {
+            "name": "Starters playing"
+          }
+        }
+      },
+      "win_probability": {
+        "name": "Win probability"
+      },
       "opponent": {
         "name": "Opponent",
         "state_attributes": {

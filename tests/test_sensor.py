@@ -77,6 +77,9 @@ async def test_sensor_values(
         ("sensor.wombats_league_matchup_points", "71.66"),
         ("sensor.wombats_league_starters_out", "2"),
         ("sensor.wombats_league_opponent_points", "35.9"),
+        ("sensor.wombats_league_projected_points", "92.75"),
+        ("sensor.wombats_league_opponent_projected_points", "62.62"),
+        ("sensor.wombats_league_win_probability", "98.7"),
         ("sensor.wombats_league_opponent", "user_12"),
         ("sensor.wombats_league_last_big_play", STATE_UNKNOWN),
         ("sensor.wombats_league_waiver_position", "6"),
@@ -94,11 +97,24 @@ async def test_sensor_values(
         ("sensor.test_league_matchup_points", STATE_UNKNOWN),
         ("sensor.test_league_starters_out", "10"),
         ("sensor.test_league_opponent_points", STATE_UNKNOWN),
+        ("sensor.test_league_projected_points", STATE_UNKNOWN),
+        ("sensor.test_league_win_probability", STATE_UNKNOWN),
         ("sensor.test_league_opponent", STATE_UNKNOWN),
     ):
         entity_state = hass.states.get(entity_id)
         assert entity_state is not None, entity_id
         assert entity_state.state == state, entity_id
+
+    projected = hass.states.get("sensor.wombats_league_projected_points")
+    assert projected is not None
+    assert projected.attributes["remaining_points"] == 21.09
+    assert projected.attributes["pregame_projection"] == 109.15
+    assert projected.attributes["starters_yet_to_play"] == 1
+    assert projected.attributes["starters_playing"] == 3
+    opponent = hass.states.get("sensor.wombats_league_opponent_projected_points")
+    assert opponent is not None
+    assert opponent.attributes["starters_yet_to_play"] == 2
+    assert opponent.attributes["entity_picture"] is not None
 
     matchup = hass.states.get("sensor.wombats_league_matchup_points")
     assert matchup is not None

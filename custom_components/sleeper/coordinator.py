@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 import logging
+import math
+from types import MappingProxyType
 from typing import TYPE_CHECKING, override
 
 from homeassistant.config_entries import ConfigEntry
@@ -23,15 +25,19 @@ from .api import (
     DRAFT_STATUS_PAUSED,
     DRAFT_STATUS_PRE_DRAFT,
     DRAFT_TYPE_AUCTION,
+    GAME_STATUS_IN_GAME,
+    GAME_STATUS_PRE_GAME,
     SleeperClient,
     SleeperDraft,
     SleeperDraftPick,
     SleeperError,
+    SleeperGame,
     SleeperLeague,
     SleeperLeagueUser,
     SleeperMatchup,
     SleeperNotFoundError,
     SleeperPlayer,
+    SleeperProjection,
     SleeperRoster,
     SleeperSportState,
     SleeperTradedPick,
@@ -46,14 +52,18 @@ from .const import (
     EVENT_DRAFT_ON_THE_CLOCK,
     EVENT_DRAFT_PICK,
     EVENT_PLAYER_SCORED,
+    GAMES_REFRESH_INTERVAL,
     IDLE_OFFSEASON_UPDATE_INTERVAL,
     IDLE_SEASON_UPDATE_INTERVAL,
+    KICKOFF_GRACE_PERIOD,
     LEAGUE_REFRESH_INTERVAL,
     LEAGUE_STATUS_IN_SEASON,
     LIVE_GRACE_PERIOD,
     LIVE_UPDATE_INTERVAL,
+    MATCHUP_MARGIN_STDDEV,
     NOTABLE_POINTS_DELTA,
     PLAYER_STATUS_INACTIVE,
+    PROJECTIONS_REFRESH_INTERVAL,
     SCORING_SEASON_TYPES,
     STARTER_OUT_INJURY_STATUSES,
 )
@@ -142,6 +152,27 @@ class SleeperStarter:
 
 
 @dataclass(frozen=True, slots=True)
+class SleeperOutlook:
+    """Where one side of a matchup is heading, from its starters' projections.
+
+    ``remaining`` is the projected points still to come: each starter's
+    projection times the share of their game that is left. ``projection``
+    is the line-up's pre-game projection, all games included.
+    """
+
+    points: float
+    remaining: float
+    projection: float
+    yet_to_play: int
+    playing: int
+
+    @property
+    def projected(self) -> float:
+        """Return the points the side is projected to end the week with."""
+        return round(self.points + self.remaining, 2)
+
+
+@dataclass(frozen=True, slots=True)
 class SleeperUpcomingPick:
     """A draft pick that has not been made yet, and the team that owns it."""
 
@@ -189,6 +220,10 @@ class SleeperLeagueData:
     draft_picks: tuple[SleeperDraftPick, ...] = ()
     traded_picks: tuple[SleeperTradedPick, ...] = ()
     new_draft_picks: tuple[SleeperDraftPick, ...] = ()
+    # Projections of the starters in the account's matchup and the week's
+    # games by team; ``None`` when they could not be loaded.
+    projections: Mapping[str, SleeperProjection] | None = None
+    games: Mapping[str, SleeperGame] | None = None
 
     def _starters(self, player_ids: tuple[str, ...]) -> tuple[SleeperStarter, ...]:
         """Resolve a list of starter IDs to slots and players."""
@@ -433,6 +468,104 @@ class SleeperLeagueData:
             None,
         )
 
+    def starter_game(self, player_id: str) -> SleeperGame | None:
+        """Return the game a starter plays in this week, if any.
+
+        The team comes from the projection, or from the player list for
+        players without one; a team without a game this week is on a bye.
+        """
+        if self.games is None:
+            return None
+        projection = (
+            None if self.projections is None else self.projections.get(player_id)
+        )
+        player = self.player_lookup(player_id)
+        team = projection.team if projection else player.team if player else None
+        return self.games.get(team) if team else None
+
+    @property
+    def matchup_games(self) -> tuple[SleeperGame, ...]:
+        """Return the games that starters on either side of the matchup play in."""
+        games = {
+            game.game_id: game
+            for matchup in (self.my_matchup, self.opponent_matchup)
+            if matchup is not None
+            for player_id in matchup.starters
+            if player_id != EMPTY_SLOT_PLAYER_ID
+            and (game := self.starter_game(player_id)) is not None
+        }
+        return tuple(games[game_id] for game_id in sorted(games))
+
+    def _outlook(self, matchup: SleeperMatchup | None) -> SleeperOutlook | None:
+        """Project where one side of the account's matchup ends the week.
+
+        A projected player whose game is missing from the schedule counts as
+        not started.
+        """
+        if matchup is None or self.projections is None or self.games is None:
+            return None
+        remaining = projection_total = 0.0
+        yet_to_play = playing = 0
+        for player_id in matchup.starters:
+            if player_id == EMPTY_SLOT_PLAYER_ID:
+                continue
+            projection = self.projections.get(player_id)
+            game = self.starter_game(player_id)
+            if game is None and projection is None:
+                continue
+            share = 1.0 if game is None else game.remaining
+            if game is not None and game.status == GAME_STATUS_IN_GAME:
+                playing += 1
+            elif share == 1.0:
+                yet_to_play += 1
+            if projection is not None:
+                points = self.league.fantasy_points(projection.stats)
+                projection_total += points
+                remaining += points * share
+        return SleeperOutlook(
+            points=matchup.points,
+            remaining=round(remaining, 2),
+            projection=round(projection_total, 2),
+            yet_to_play=yet_to_play,
+            playing=playing,
+        )
+
+    @property
+    def my_outlook(self) -> SleeperOutlook | None:
+        """Return the projection of the account's side of the matchup."""
+        return self._outlook(self.my_matchup)
+
+    @property
+    def opponent_outlook(self) -> SleeperOutlook | None:
+        """Return the projection of the opponent's side of the matchup."""
+        return self._outlook(self.opponent_matchup)
+
+    @property
+    def win_probability(self) -> float | None:
+        """Return the account's chance to win its matchup, in percent.
+
+        The final margin is taken as normally distributed around the
+        projected margin. Its spread shrinks with the square root of the
+        share of both line-ups' projected points still to come, so the
+        chance settles at 0 or 100 % (50 % for a tie) once all games are
+        over.
+        """
+        if (mine := self.my_outlook) is None or (
+            theirs := self.opponent_outlook
+        ) is None:
+            return None
+        margin = mine.projected - theirs.projected
+        projection = mine.projection + theirs.projection
+        to_come = mine.remaining + theirs.remaining
+        spread = (
+            MATCHUP_MARGIN_STDDEV * math.sqrt(to_come / projection)
+            if projection > 0
+            else 0.0
+        )
+        if spread == 0:
+            return 50.0 if margin == 0 else 100.0 if margin > 0 else 0.0
+        return round(50 * (1 + math.erf(margin / (spread * math.sqrt(2)))), 1)
+
     @property
     def opponent_roster(self) -> SleeperRoster | None:
         """Return the roster the account plays against this week."""
@@ -539,6 +672,18 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         self._last_big_play: dict[str, SleeperPointsChange] = {}
         # The running background download of the player list, if any.
         self._players_refresh: asyncio.Task[None] | None = None
+        # Whether the last attempt to load projections and games failed.
+        self._projections_failed = False
+        # The week the projections and games below are of; the projections
+        # requested, the ones that cannot change any more, the time of the
+        # last full refresh of the others, and the games with their time.
+        self._projections_week: tuple[str, str, int] | None = None
+        self._projections: dict[str, SleeperProjection] = {}
+        self._projections_requested: set[str] = set()
+        self._final_projections: set[str] = set()
+        self._projections_fetched: datetime | None = None
+        self._games: tuple[SleeperGame, ...] | None = None
+        self._games_fetched: datetime | None = None
 
     @override
     async def _async_update_data(self) -> SleeperData:
@@ -557,7 +702,9 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             )
         except SleeperError as err:
             raise UpdateFailed(f"Error communicating with Sleeper: {err}") from err
-        leagues = {data.league.league_id: data for data in fetched}
+        leagues = await self._async_add_projections(
+            now, state, {data.league.league_id: data for data in fetched}
+        )
 
         if TYPE_CHECKING:
             assert self._user is not None
@@ -754,6 +901,164 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             draft_picks=draft_picks,
             traded_picks=traded_picks,
         )
+
+    async def _async_add_projections(
+        self,
+        now: datetime,
+        state: SleeperSportState,
+        leagues: dict[str, SleeperLeagueData],
+    ) -> dict[str, SleeperLeagueData]:
+        """Attach the starters' projections and the week's games to the leagues.
+
+        Both come from Sleeper's undocumented GraphQL API, which is not
+        cached, so they are kept and only requested again when they can have
+        changed; see ``_games_due`` and ``_projections_due``. One request
+        covers the starters of both sides of the account's matchups in all
+        leagues. When a request fails, the projections are unknown for this
+        poll and it is retried on the next one; the rest of the data is good.
+        """
+        starters = {
+            player_id
+            for data in leagues.values()
+            for matchup in (data.my_matchup, data.opponent_matchup)
+            if matchup is not None
+            for player_id in matchup.starters
+            if player_id != EMPTY_SLOT_PLAYER_ID
+        }
+        if not starters:
+            return leagues
+        week = (state.season, state.season_type, state.week)
+        if week != self._projections_week:
+            self._projections_week = week
+            self._projections = {}
+            self._projections_requested = set()
+            self._final_projections = set()
+            self._projections_fetched = None
+            self._games = None
+            self._games_fetched = None
+        cached = self._with_projections(leagues)
+        refresh, full_refresh = self._projections_due(now, starters, cached)
+        games_due = self._games_due(now, cached)
+        try:
+            projections, games = await asyncio.gather(
+                self._async_fetch_projections(state, refresh),
+                self._async_fetch_games(state, due=games_due),
+            )
+        except SleeperError as err:
+            if not self._projections_failed:
+                _LOGGER.warning("Could not load the Sleeper projections: %s", err)
+                self._projections_failed = True
+            return leagues
+        if self._projections_failed:
+            _LOGGER.info("Sleeper projections are available again")
+            self._projections_failed = False
+        if games is not None:
+            self._games = games
+            self._games_fetched = now
+        if projections is not None:
+            # A player missing from the answer has no projection (any more).
+            for player_id in refresh:
+                self._projections.pop(player_id, None)
+            self._projections.update(projections)
+            self._projections_requested |= refresh
+            if full_refresh:
+                self._projections_fetched = now
+        result = self._with_projections(leagues)
+        if projections is not None:
+            # Sleeper keeps a projection as it is once the game has started.
+            self._final_projections |= {
+                player_id
+                for data in result.values()
+                for player_id in refresh
+                if (game := data.starter_game(player_id)) is not None
+                and game.status != GAME_STATUS_PRE_GAME
+            }
+        return result
+
+    def _with_projections(
+        self, leagues: dict[str, SleeperLeagueData]
+    ) -> dict[str, SleeperLeagueData]:
+        """Attach the kept projections and games to the leagues, once loaded."""
+        if self._games is None:
+            return leagues
+        projections = MappingProxyType(dict(self._projections))
+        games = MappingProxyType(
+            {team: game for game in self._games for team in game.teams}
+        )
+        return {
+            league_id: replace(data, projections=projections, games=games)
+            for league_id, data in leagues.items()
+        }
+
+    def _games_due(self, now: datetime, leagues: dict[str, SleeperLeagueData]) -> bool:
+        """Return whether the week's games have to be requested again.
+
+        They are needed every poll while a game with a starter of the
+        account's matchups is running, or past its kickoff and not marked as
+        started yet. Otherwise only the kickoff times matter, which are known
+        weeks ahead, so an hourly request follows schedule changes.
+        """
+        if (
+            self._games_fetched is None
+            or now - self._games_fetched >= GAMES_REFRESH_INTERVAL
+        ):
+            return True
+        return any(
+            game.status == GAME_STATUS_IN_GAME
+            or (
+                game.status == GAME_STATUS_PRE_GAME
+                and game.start_time is not None
+                and game.start_time <= now
+            )
+            for data in leagues.values()
+            for game in data.matchup_games
+        )
+
+    def _projections_due(
+        self,
+        now: datetime,
+        starters: set[str],
+        leagues: dict[str, SleeperLeagueData],
+    ) -> tuple[set[str], bool]:
+        """Return the starters whose projections have to be requested again.
+
+        A starter new to a line-up is requested right away. All starters
+        whose game had not started at their last request are requested
+        hourly (Sleeper updates projections about that often) and after a
+        kickoff of one of the matchups' games, which picks up players ruled
+        out shortly before. The flag tells whether it is such a full refresh.
+        """
+        fetched = self._projections_fetched
+        full_refresh = (
+            fetched is None
+            or now - fetched >= PROJECTIONS_REFRESH_INTERVAL
+            or any(
+                game.start_time is not None and fetched < game.start_time <= now
+                for data in leagues.values()
+                for game in data.matchup_games
+            )
+        )
+        if full_refresh:
+            return starters - self._final_projections, True
+        return starters - self._projections_requested, False
+
+    async def _async_fetch_projections(
+        self, state: SleeperSportState, player_ids: set[str]
+    ) -> dict[str, SleeperProjection] | None:
+        """Request the projections of some players, ``None`` if there are none."""
+        if not player_ids:
+            return None
+        return await self.client.get_projections(
+            state.season, state.season_type, state.week, sorted(player_ids)
+        )
+
+    async def _async_fetch_games(
+        self, state: SleeperSportState, *, due: bool
+    ) -> tuple[SleeperGame, ...] | None:
+        """Request the week's games if they are due, ``None`` otherwise."""
+        if not due:
+            return None
+        return await self.client.get_games(state.season, state.season_type, state.week)
 
     def _detect_points_changes(
         self, leagues: dict[str, SleeperLeagueData]
@@ -957,16 +1262,20 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         state: SleeperSportState,
         leagues: dict[str, SleeperLeagueData],
     ) -> None:
-        """Pick the next update interval from the observed activity.
+        """Pick the next update interval from the games and the observed activity.
 
-        Changing matchup points or draft picks switch to the live interval.
+        A running game with a starter of the account's matchups, on either
+        side, or changing points in those matchups switch to the live
+        interval; games without such starters and other teams' matchups do
+        not count. The next kickoff of such a game pulls the poll forward.
         Otherwise a running draft polls at the draft interval, and a draft
-        scheduled to start before the next poll pulls the poll forward.
+        scheduled to start before the next poll pulls the poll forward too.
         """
         points = {
             (league_id, matchup.roster_id): matchup.points
             for league_id, data in leagues.items()
-            for matchup in data.matchups
+            for matchup in (data.my_matchup, data.opponent_matchup)
+            if matchup is not None
         }
         picked = {
             data.draft.draft_id: data.draft.last_picked
@@ -1014,6 +1323,36 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             elif -until_start < DRAFT_START_GRACE_PERIOD:
                 interval = min(interval, DRAFT_UPDATE_INTERVAL)
 
+        interval = self._interval_for_games(now, leagues, interval)
+
         if interval != self.update_interval:
             _LOGGER.debug("Switching update interval to %s", interval)
             self.update_interval = interval
+
+    @staticmethod
+    def _interval_for_games(
+        now: datetime, leagues: dict[str, SleeperLeagueData], interval: timedelta
+    ) -> timedelta:
+        """Shorten the interval for the games of the account's matchups.
+
+        Only games in which a starter of either side plays count. A running
+        one switches to the live interval, and the next kickoff pulls the
+        poll forward. A game past its kickoff that Sleeper still shows as not
+        started keeps the live interval for a while.
+        """
+        games = {
+            game.game_id: game
+            for data in leagues.values()
+            for game in data.matchup_games
+        }
+        for game in games.values():
+            if game.status == GAME_STATUS_IN_GAME:
+                return LIVE_UPDATE_INTERVAL
+            if game.status != GAME_STATUS_PRE_GAME or game.start_time is None:
+                continue
+            until_kickoff = game.start_time - now
+            if until_kickoff > timedelta(0):
+                interval = min(interval, max(until_kickoff, LIVE_UPDATE_INTERVAL))
+            elif -until_kickoff < KICKOFF_GRACE_PERIOD:
+                return LIVE_UPDATE_INTERVAL
+        return interval
