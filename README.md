@@ -346,9 +346,6 @@ Please attach the log output when [opening an issue](https://github.com/daniel-w
 
 ## Development
 
-See [CLAUDE.md](CLAUDE.md) for the development workflow, conventions and the Home Assistant
-quality-scale checklist this project follows.
-
 ```bash
 scripts/setup    # create .venv with Home Assistant and tooling
 scripts/develop  # start a dev Home Assistant on http://localhost:8123

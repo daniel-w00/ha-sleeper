@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-27
+
+### Added
+
+- **Projected points**, **Opponent projected points** and **Win probability** sensors for
+  each league, calculated with your league's scoring settings.
+
+### Changed
+
+- Live scores now update right from kickoff instead of up to 15 minutes late.
+
 ## [0.3.0] - 2026-10-04
 
 ### Changed
@@ -60,7 +71,8 @@ All notable changes to this project are documented here. The format follows
 - Development environment (uv venv pinned to Home Assistant 2026.9.2), tests, and CI with
   hassfest and HACS validation.
 
-[Unreleased]: https://github.com/daniel-w00/ha-sleeper/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/daniel-w00/ha-sleeper/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/daniel-w00/ha-sleeper/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/daniel-w00/ha-sleeper/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/daniel-w00/ha-sleeper/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/daniel-w00/ha-sleeper/releases/tag/v0.1.0
