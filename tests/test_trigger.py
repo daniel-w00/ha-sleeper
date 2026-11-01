@@ -33,12 +33,14 @@ from custom_components.sleeper.const import (
     DRAFT_UPDATE_INTERVAL,
     EVENT_DRAFT_ON_THE_CLOCK,
     EVENT_DRAFT_PICK,
+    EVENT_MATCHUP_FINISHED,
     EVENT_PLAYER_SCORED,
     IDLE_SEASON_UPDATE_INTERVAL,
 )
 from custom_components.sleeper.coordinator import league_device_identifier
 from custom_components.sleeper.trigger import (
     DraftPickMadeTrigger,
+    MatchupFinishedTrigger,
     OnTheClockTrigger,
     PlayerScoredTrigger,
     SleeperEventTrigger,
@@ -58,6 +60,7 @@ from .conftest import (
 TRIGGER_KEY = f"{DOMAIN}.player_scored"
 PICK_TRIGGER_KEY = f"{DOMAIN}.draft_pick_made"
 CLOCK_TRIGGER_KEY = f"{DOMAIN}.on_the_clock"
+FINISHED_TRIGGER_KEY = f"{DOMAIN}.matchup_finished"
 INTEGRATION = Path("custom_components") / DOMAIN
 
 # My QB gains 6.34 points, the opponent's kicker loses 3 points.
@@ -141,6 +144,18 @@ def drafted(**data: Any) -> dict[str, Any]:
         "picked_by": None,
         "player": "X",
         "team": None,
+        **data,
+    }
+
+
+def finished(**data: Any) -> dict[str, Any]:
+    """Return complete matchup finished event data with some fields replaced."""
+    return {
+        "device_id": None,
+        "result": "win",
+        "points": 112.4,
+        "opponent": "Team 2",
+        "opponent_points": 98.1,
         **data,
     }
 
@@ -349,6 +364,7 @@ async def test_not_triggered_reports(hass: HomeAssistant) -> None:
         (PlayerScoredTrigger, EVENT_PLAYER_SCORED, scored(delta="6")),
         (DraftPickMadeTrigger, EVENT_DRAFT_PICK, drafted(player=None)),
         (OnTheClockTrigger, EVENT_DRAFT_ON_THE_CLOCK, drafted(is_mine="yes")),
+        (MatchupFinishedTrigger, EVENT_MATCHUP_FINISHED, finished(result="draw")),
     ],
 )
 async def test_event_fired_by_hand(
@@ -386,6 +402,9 @@ async def test_descriptions_and_translations(
         description = descriptions[key]
         assert description is not None
         assert set(description["fields"]) == {"picker"}
+    description = descriptions[FINISHED_TRIGGER_KEY]
+    assert description is not None
+    assert set(description["fields"]) == {"result"}
 
     triggers = yaml.safe_load((INTEGRATION / "triggers.yaml").read_text())
     triggers = {
@@ -397,7 +416,7 @@ async def test_descriptions_and_translations(
         set(triggers)
         == set(strings)
         == set(icons)
-        == {"player_scored", "draft_pick_made", "on_the_clock"}
+        == {"player_scored", "draft_pick_made", "on_the_clock", "matchup_finished"}
     )
     for key, trigger in triggers.items():
         assert set(trigger["fields"]) == set(strings[key]["fields"])
@@ -541,3 +560,46 @@ async def test_invalid_picker(
     assert state is not None
     assert state.state == "unavailable"
     assert "value must be one of ['any', 'mine', 'others']" in caplog.text
+
+
+async def test_matchup_finished(hass: HomeAssistant) -> None:
+    """Test the matchup finished trigger and its result option."""
+    run_action = MagicMock()
+    did_not_trigger = MagicMock()
+    config = await MatchupFinishedTrigger.async_validate_config(
+        hass, {"options": {"result": "loss"}}
+    )
+    trigger = MatchupFinishedTrigger(
+        hass, TriggerConfig(FINISHED_TRIGGER_KEY, options=config["options"])
+    )
+    remove = await trigger.async_attach_runner(run_action, did_not_trigger)
+
+    hass.bus.async_fire(EVENT_MATCHUP_FINISHED, finished())
+    await hass.async_block_till_done()
+    assert did_not_trigger.call_args.args[0] == NotTriggeredInfo(
+        "other_result", {"result": "win"}
+    )
+    hass.bus.async_fire(
+        EVENT_MATCHUP_FINISHED, finished(result="loss", points=90, opponent=None)
+    )
+    await hass.async_block_till_done()
+    run_action.assert_called_once()
+    assert run_action.call_args.args[1] == (
+        "Matchup against the opponent finished: loss, 90 to 98.1"
+    )
+    remove()
+
+    # Any result is the default.
+    config = await MatchupFinishedTrigger.async_validate_config(hass, {})
+    assert config["options"] == {"result": "any"}
+    trigger = MatchupFinishedTrigger(
+        hass, TriggerConfig(FINISHED_TRIGGER_KEY, options=config["options"])
+    )
+    remove = await trigger.async_attach_runner(run_action, did_not_trigger)
+    hass.bus.async_fire(EVENT_MATCHUP_FINISHED, finished())
+    await hass.async_block_till_done()
+    assert run_action.call_count == 2
+    assert run_action.call_args.args[1] == (
+        "Matchup against Team 2 finished: win, 112.4 to 98.1"
+    )
+    remove()

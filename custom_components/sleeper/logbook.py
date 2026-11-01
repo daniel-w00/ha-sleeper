@@ -13,7 +13,14 @@ from homeassistant.components.logbook.const import (
 from homeassistant.components.logbook.models import LazyEventPartialState
 from homeassistant.core import HomeAssistant, callback
 
-from .const import DOMAIN, EVENT_DRAFT_PICK, EVENT_PLAYER_SCORED
+from .const import (
+    DOMAIN,
+    EVENT_DRAFT_PICK,
+    EVENT_MATCHUP_FINISHED,
+    EVENT_PLAYER_SCORED,
+)
+
+MATCHUP_RESULT_VERBS = {"win": "won", "loss": "lost", "tie": "tied"}
 
 
 @callback
@@ -59,5 +66,25 @@ def async_describe_events(
             LOGBOOK_ENTRY_ICON: "mdi:clipboard-list-outline",
         }
 
+    @callback
+    def async_describe_matchup_finished(
+        event: LazyEventPartialState,
+    ) -> dict[str, Any]:
+        """Describe a finished matchup, e.g. "won 112.4 to 98.1 against Team 2"."""
+        data = event.data
+        verb = MATCHUP_RESULT_VERBS[data["result"]]
+        opponent = data["opponent"] or "the opponent"
+        return {
+            LOGBOOK_ENTRY_NAME: data["team"] or "Your team",
+            LOGBOOK_ENTRY_MESSAGE: (
+                f"{verb} {data['points']:g} to {data['opponent_points']:g} "
+                f"against {opponent} (week {data['week']}, {data['league']})"
+            ),
+            LOGBOOK_ENTRY_ICON: "mdi:flag-checkered",
+        }
+
     async_describe_event(DOMAIN, EVENT_PLAYER_SCORED, async_describe_player_scored)
     async_describe_event(DOMAIN, EVENT_DRAFT_PICK, async_describe_draft_pick)
+    async_describe_event(
+        DOMAIN, EVENT_MATCHUP_FINISHED, async_describe_matchup_finished
+    )

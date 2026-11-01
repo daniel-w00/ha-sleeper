@@ -1066,6 +1066,35 @@ def test_win_probability_with_negative_projection_left() -> None:
     assert data.win_probability == 100
 
 
+def test_matchup_finished_and_result() -> None:
+    """Test a matchup is over once the games of both sides' starters are."""
+    data = _projected_league(
+        starters={1: ["a1", "bye"], 2: ["b1"]},
+        points={1: 30, 2: 20},
+        projections={"a1": ("KC", 12), "b1": ("BUF", 8)},
+        games=(
+            _game("1", "complete", ("KC", "DEN")),
+            _game("2", "in_game", ("BUF", "MIA"), quarter=4),
+        ),
+    )
+    assert data.matchup_finished is False
+    assert data.matchup_result == "win"
+
+    assert data.games is not None
+    games = {
+        team: replace(game, status="complete") for team, game in data.games.items()
+    }
+    assert replace(data, games=games).matchup_finished is True
+
+    # Without the games, or without a game for any starter, it is unknown.
+    assert replace(data, games=None).matchup_finished is None
+    assert replace(data, games={}).matchup_finished is None
+
+    tied = tuple(replace(matchup, custom_points=25.0) for matchup in data.matchups)
+    assert replace(data, matchups=tied).matchup_result == "tie"
+    assert replace(data, matchups=data.matchups[1:]).matchup_result is None
+
+
 def test_commissioner_points_count() -> None:
     """Test the commissioner's correction replaces the scored points."""
     data = _projected_league(

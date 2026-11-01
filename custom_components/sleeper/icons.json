@@ -72,6 +72,9 @@
     },
     "on_the_clock": {
       "trigger": "mdi:timer-sand"
+    },
+    "matchup_finished": {
+      "trigger": "mdi:flag-checkered"
     }
   }
 }

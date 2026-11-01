@@ -55,3 +55,18 @@ on_the_clock:
             - any
             - mine
             - others
+
+matchup_finished:
+  target: *target
+  fields:
+    result:
+      required: true
+      default: any
+      selector:
+        select:
+          translation_key: result
+          options:
+            - any
+            - win
+            - loss
+            - tie

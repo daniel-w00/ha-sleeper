@@ -25,6 +25,7 @@ from .api import (
     DRAFT_STATUS_PAUSED,
     DRAFT_STATUS_PRE_DRAFT,
     DRAFT_TYPE_AUCTION,
+    GAME_STATUS_COMPLETE,
     GAME_STATUS_IN_GAME,
     GAME_STATUS_PRE_GAME,
     SleeperClient,
@@ -51,6 +52,7 @@ from .const import (
     EMPTY_SLOT_PLAYER_ID,
     EVENT_DRAFT_ON_THE_CLOCK,
     EVENT_DRAFT_PICK,
+    EVENT_MATCHUP_FINISHED,
     EVENT_PLAYER_SCORED,
     GAMES_REFRESH_INTERVAL,
     IDLE_OFFSEASON_UPDATE_INTERVAL,
@@ -509,6 +511,30 @@ class SleeperLeagueData:
         }
         return tuple(games[game_id] for game_id in sorted(games))
 
+    @property
+    def matchup_finished(self) -> bool | None:
+        """Return whether every game of the account's matchup is over.
+
+        Unknown without a matchup, without the week's games, and when no
+        starter of either side has a game this week.
+        """
+        if self.my_matchup is None or self.games is None:
+            return None
+        if not (games := self.matchup_games):
+            return None
+        return all(game.status == GAME_STATUS_COMPLETE for game in games)
+
+    @property
+    def matchup_result(self) -> str | None:
+        """Return "win", "loss" or "tie" by the current score of the matchup."""
+        if (mine := self.my_matchup) is None or (
+            theirs := self.opponent_matchup
+        ) is None:
+            return None
+        if mine.score == theirs.score:
+            return "tie"
+        return "win" if mine.score > theirs.score else "loss"
+
     def _outlook(self, matchup: SleeperMatchup | None) -> SleeperOutlook | None:
         """Project where one side of the account's matchup ends the week.
 
@@ -686,6 +712,9 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         self._last_player_points: dict[tuple[str, int, int, str], float] = {}
         # league_id -> biggest change of the last poll that had any
         self._last_big_play: dict[str, SleeperPointsChange] = {}
+        # league_id -> week and whether the account's matchup was over, as of
+        # the last poll that knew its games
+        self._matchup_finished: dict[str, tuple[int, bool]] = {}
         # The running background download of the player list, if any.
         self._players_refresh: asyncio.Task[None] | None = None
         # Whether the last attempt to load projections and games failed.
@@ -730,6 +759,7 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         for data in leagues.values():
             self._async_fire_scoring_events(data)
             self._async_fire_draft_events(data)
+            self._async_fire_matchup_finished(data)
         return SleeperData(user=self._user, state=state, leagues=leagues)
 
     def _leagues_need_refresh(self, now: datetime, state: SleeperSportState) -> bool:
@@ -1173,6 +1203,47 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
                     "matchup_id": matchup_id,
                 },
             )
+
+    @callback
+    def _async_fire_matchup_finished(self, data: SleeperLeagueData) -> None:
+        """Fire an event when the last game of the account's matchup is over.
+
+        It fires once per week, and not for a matchup that was over already
+        at the first poll that saw it, so a restart does not repeat it.
+        While the games are unknown, nothing changes: the event comes late
+        rather than never.
+        """
+        finished = data.matchup_finished
+        mine, theirs = data.my_matchup, data.opponent_matchup
+        if finished is None or mine is None or theirs is None:
+            return
+        league_id, week = data.league.league_id, data.week
+        seen = self._matchup_finished.get(league_id)
+        if seen == (week, True):
+            return
+        self._matchup_finished[league_id] = (week, finished)
+        if seen != (week, False) or not finished:
+            return
+        device = dr.async_get(self.hass).async_get_device_by_identifier(
+            league_device_identifier(self.user_id, league_id),
+            config_entry_id=self.config_entry.entry_id,
+        )
+        self.hass.bus.async_fire(
+            EVENT_MATCHUP_FINISHED,
+            {
+                ATTR_DEVICE_ID: device.id if device else None,
+                "user_id": self.user_id,
+                "league_id": league_id,
+                "league": data.league.name,
+                "week": week,
+                "matchup_id": mine.matchup_id,
+                "result": data.matchup_result,
+                "team": data.my_team_name,
+                "points": mine.score,
+                "opponent": data.opponent_name,
+                "opponent_points": theirs.score,
+            },
+        )
 
     def _detect_new_picks(
         self, leagues: dict[str, SleeperLeagueData]

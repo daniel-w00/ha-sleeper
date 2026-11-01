@@ -15,14 +15,16 @@ from pytest_homeassistant_custom_component.common import (
     async_capture_events,
 )
 
-from custom_components.sleeper.api import SleeperMatchup
+from custom_components.sleeper.api import SleeperConnectionError, SleeperMatchup
 from custom_components.sleeper.const import (
     DOMAIN,
     DRAFT_UPDATE_INTERVAL,
     EVENT_DRAFT_ON_THE_CLOCK,
     EVENT_DRAFT_PICK,
+    EVENT_MATCHUP_FINISHED,
     EVENT_PLAYER_SCORED,
     IDLE_SEASON_UPDATE_INTERVAL,
+    LIVE_UPDATE_INTERVAL,
 )
 from custom_components.sleeper.coordinator import league_device_identifier
 from custom_components.sleeper.logbook import async_describe_events
@@ -36,6 +38,7 @@ from .conftest import (
     draft_for,
     draft_picks_for,
     drafting_picks,
+    games_fixture,
     matchups_for,
     matchups_with_points,
 )
@@ -433,3 +436,108 @@ def test_draft_pick_logbook_description(hass: HomeAssistant) -> None:
         Event(EVENT_DRAFT_PICK, {**data, "picked_by": None, "roster_id": None})
     )
     assert entry["name"] == "Someone"
+
+
+async def test_matchup_finished_event(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    device_registry: dr.DeviceRegistry,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test the end of the last game of the matchup fires one event."""
+    events = async_capture_events(hass, EVENT_MATCHUP_FINISHED)
+    device = device_registry.async_get_device_by_identifier(
+        league_device_identifier(TEST_USER_ID, LEAGUE_ID),
+        config_entry_id=init_integration.entry_id,
+    )
+    assert device is not None
+
+    # Games of the matchup are still running or yet to start.
+    await async_poll(hass, freezer, LIVE_UPDATE_INTERVAL)
+    assert not events
+
+    # Sleeper's GraphQL API is down: unknown, nothing is decided.
+    mock_client.get_games.side_effect = SleeperConnectionError("down")
+    await async_poll(hass, freezer, LIVE_UPDATE_INTERVAL)
+    assert not events
+
+    # Back at the next (idle, without the games) poll, and every game is over.
+    mock_client.get_games.side_effect = None
+    mock_client.get_games.return_value = tuple(
+        replace(game, status="complete") for game in games_fixture()
+    )
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    assert len(events) == 1
+    assert events[0].data == {
+        "device_id": device.id,
+        "user_id": TEST_USER_ID,
+        "league_id": LEAGUE_ID,
+        "league": "Wombats League",
+        "week": 1,
+        "matchup_id": 6,
+        "result": "win",
+        "team": "Test Team",
+        "points": 71.66,
+        "opponent": "user_12",
+        "opponent_points": 35.9,
+    }
+
+    # Once per week.
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    assert len(events) == 1
+
+
+async def test_matchup_over_at_first_sight(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test a matchup that is over when Home Assistant starts fires nothing."""
+    events = async_capture_events(hass, EVENT_MATCHUP_FINISHED)
+    mock_client.get_games.return_value = tuple(
+        replace(game, status="complete") for game in games_fixture()
+    )
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    assert not events
+
+
+def test_matchup_finished_logbook_description(hass: HomeAssistant) -> None:
+    """Test the logbook renders a finished matchup as a readable line."""
+    described: dict[tuple[str, str], Any] = {}
+
+    def register(domain: str, event_type: str, describe: Any) -> None:
+        described[(domain, event_type)] = describe
+
+    async_describe_events(hass, register)
+    describe = described[(DOMAIN, EVENT_MATCHUP_FINISHED)]
+
+    data = {
+        "result": "win",
+        "team": "Test Team",
+        "points": 112.4,
+        "opponent": "Team 2",
+        "opponent_points": 98.12,
+        "week": 8,
+        "league": "Wombats League",
+    }
+    entry = describe(Event(EVENT_MATCHUP_FINISHED, data))
+    assert entry["name"] == "Test Team"
+    assert entry["message"] == (
+        "won 112.4 to 98.12 against Team 2 (week 8, Wombats League)"
+    )
+    assert entry["icon"] == "mdi:flag-checkered"
+
+    entry = describe(
+        Event(
+            EVENT_MATCHUP_FINISHED,
+            {**data, "result": "tie", "team": None, "opponent": None},
+        )
+    )
+    assert entry["name"] == "Your team"
+    assert entry["message"].startswith("tied 112.4 to 98.12 against the opponent")

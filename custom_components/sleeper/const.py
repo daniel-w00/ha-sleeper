@@ -72,3 +72,7 @@ NOTABLE_POINTS_DELTA: Final = 3.0
 # account) comes on the clock.
 EVENT_DRAFT_PICK: Final = "sleeper_draft_pick"
 EVENT_DRAFT_ON_THE_CLOCK: Final = "sleeper_draft_on_the_clock"
+# Bus event fired once a week when the last game of the account's matchup is
+# over, with the result by the score at that time.
+EVENT_MATCHUP_FINISHED: Final = "sleeper_matchup_finished"
+MATCHUP_RESULTS: Final = ("win", "loss", "tie")

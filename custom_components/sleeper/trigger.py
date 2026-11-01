@@ -36,13 +36,16 @@ from .const import (
     DOMAIN,
     EVENT_DRAFT_ON_THE_CLOCK,
     EVENT_DRAFT_PICK,
+    EVENT_MATCHUP_FINISHED,
     EVENT_PLAYER_SCORED,
+    MATCHUP_RESULTS,
     NOTABLE_POINTS_DELTA,
 )
 
 CONF_SIDE = "side"
 CONF_MIN_DELTA = "min_delta"
 CONF_PICKER = "picker"
+CONF_RESULT = "result"
 
 SIDE_ANY = "any"
 SIDE_MINE = "mine"
@@ -51,6 +54,8 @@ SIDE_OPPONENT = "opponent"
 PICKER_ANY = "any"
 PICKER_MINE = "mine"
 PICKER_OTHERS = "others"
+
+RESULT_ANY = "any"
 
 _PLAYER_SCORED_SCHEMA = vol.Schema(
     {
@@ -83,6 +88,16 @@ def _picker_schema(default: str) -> vol.Schema:
 
 _DRAFT_PICK_MADE_SCHEMA = _picker_schema(PICKER_ANY)
 _ON_THE_CLOCK_SCHEMA = _picker_schema(PICKER_MINE)
+_MATCHUP_FINISHED_SCHEMA = vol.Schema(
+    {
+        vol.Optional(CONF_TARGET): cv.TARGET_FIELDS,
+        vol.Required(CONF_OPTIONS, default=dict): {
+            vol.Optional(CONF_RESULT, default=RESULT_ANY): vol.In(
+                (RESULT_ANY, *MATCHUP_RESULTS)
+            ),
+        },
+    }
+)
 
 
 def _event_schema(fields: dict[vol.Marker, Any]) -> vol.Schema:
@@ -94,25 +109,42 @@ def _event_schema(fields: dict[vol.Marker, Any]) -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(ATTR_DEVICE_ID): vol.Any(str, None),
-            vol.Required("is_mine"): bool,
             **fields,
         },
         extra=vol.ALLOW_EXTRA,
     )
 
 
+_POINTS = vol.Any(int, float)
 _PLAYER_SCORED_EVENT_SCHEMA = _event_schema(
-    {vol.Required("player"): str, vol.Required("delta"): vol.Any(int, float)}
+    {
+        vol.Required("is_mine"): bool,
+        vol.Required("player"): str,
+        vol.Required("delta"): _POINTS,
+    }
 )
 _DRAFT_PICK_EVENT_SCHEMA = _event_schema(
     {
+        vol.Required("is_mine"): bool,
         vol.Required("pick"): str,
         vol.Required("player"): str,
         vol.Required("picked_by"): vol.Any(str, None),
     }
 )
 _ON_THE_CLOCK_EVENT_SCHEMA = _event_schema(
-    {vol.Required("pick"): str, vol.Required("team"): vol.Any(str, None)}
+    {
+        vol.Required("is_mine"): bool,
+        vol.Required("pick"): str,
+        vol.Required("team"): vol.Any(str, None),
+    }
+)
+_MATCHUP_FINISHED_EVENT_SCHEMA = _event_schema(
+    {
+        vol.Required("result"): vol.In(MATCHUP_RESULTS),
+        vol.Required("points"): _POINTS,
+        vol.Required("opponent"): vol.Any(str, None),
+        vol.Required("opponent_points"): _POINTS,
+    }
 )
 
 
@@ -292,10 +324,35 @@ class OnTheClockTrigger(_DraftTrigger):
         return f"{team} is on the clock ({data['pick']})"
 
 
+class MatchupFinishedTrigger(SleeperEventTrigger):
+    """Trigger that fires when the last game of the account's matchup is over."""
+
+    _event_type = EVENT_MATCHUP_FINISHED
+    _event_schema = _MATCHUP_FINISHED_EVENT_SCHEMA
+    _schema = _MATCHUP_FINISHED_SCHEMA
+
+    @override
+    def _accepts(self, data: dict[str, Any], report: _Reporter) -> bool:
+        result: str = self._options[CONF_RESULT]
+        if result not in (RESULT_ANY, data["result"]):
+            report("other_result", {"result": data["result"]})
+            return False
+        return True
+
+    @override
+    def _describe(self, data: dict[str, Any]) -> str:
+        opponent = data["opponent"] or "the opponent"
+        return (
+            f"Matchup against {opponent} finished: {data['result']}, "
+            f"{data['points']:g} to {data['opponent_points']:g}"
+        )
+
+
 TRIGGERS: dict[str, type[Trigger]] = {
     "player_scored": PlayerScoredTrigger,
     "draft_pick_made": DraftPickMadeTrigger,
     "on_the_clock": OnTheClockTrigger,
+    "matchup_finished": MatchupFinishedTrigger,
 }
 
 

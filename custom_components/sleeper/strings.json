@@ -343,6 +343,14 @@
         "mine": "My team",
         "others": "Other teams"
       }
+    },
+    "result": {
+      "options": {
+        "any": "Any",
+        "win": "Win",
+        "loss": "Loss",
+        "tie": "Tie"
+      }
     }
   },
   "triggers": {
@@ -377,6 +385,16 @@
         "picker": {
           "name": "Whose pick",
           "description": "Trigger when you are on the clock, when another team is, or for every pick."
+        }
+      }
+    },
+    "matchup_finished": {
+      "name": "Matchup finished",
+      "description": "Triggers once a week when the last game with a starter of your matchup is over, with the result by the score at that time. Stat corrections can still change it until Sleeper settles the week.",
+      "fields": {
+        "result": {
+          "name": "Result",
+          "description": "Limit the trigger to wins, losses or ties."
         }
       }
     }
