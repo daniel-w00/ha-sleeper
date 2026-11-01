@@ -85,6 +85,37 @@ _DRAFT_PICK_MADE_SCHEMA = _picker_schema(PICKER_ANY)
 _ON_THE_CLOCK_SCHEMA = _picker_schema(PICKER_MINE)
 
 
+def _event_schema(fields: dict[vol.Marker, Any]) -> vol.Schema:
+    """Return the schema of the event data a trigger reads.
+
+    The coordinator always fires complete events, but anyone can fire one
+    by hand, from the developer tools for example.
+    """
+    return vol.Schema(
+        {
+            vol.Required(ATTR_DEVICE_ID): vol.Any(str, None),
+            vol.Required("is_mine"): bool,
+            **fields,
+        },
+        extra=vol.ALLOW_EXTRA,
+    )
+
+
+_PLAYER_SCORED_EVENT_SCHEMA = _event_schema(
+    {vol.Required("player"): str, vol.Required("delta"): vol.Any(int, float)}
+)
+_DRAFT_PICK_EVENT_SCHEMA = _event_schema(
+    {
+        vol.Required("pick"): str,
+        vol.Required("player"): str,
+        vol.Required("picked_by"): vol.Any(str, None),
+    }
+)
+_ON_THE_CLOCK_EVENT_SCHEMA = _event_schema(
+    {vol.Required("pick"): str, vol.Required("team"): vol.Any(str, None)}
+)
+
+
 @callback
 def _targeted_league_devices(hass: HomeAssistant, target: ConfigType) -> set[str]:
     """Return the IDs of the league devices a trigger target refers to.
@@ -119,10 +150,12 @@ class SleeperEventTrigger(Trigger):
     """Base of the triggers built on the integration's bus events.
 
     Subclasses name the event, validate the options and decide per event
-    whether it passes their filters. The league target is checked here.
+    whether it passes their filters. The event data and the league target
+    are checked here.
     """
 
     _event_type: str
+    _event_schema: vol.Schema
     _schema: vol.Schema
 
     @override
@@ -163,6 +196,11 @@ class SleeperEventTrigger(Trigger):
         @callback
         def handle_event(event: Event[dict[str, Any]]) -> None:
             data = event.data
+            try:
+                self._event_schema(data)
+            except vol.Invalid as err:
+                report("invalid_event", {"error": str(err)})
+                return
             if self._target is not None:
                 devices = _targeted_league_devices(self._hass, self._target)
                 if data[ATTR_DEVICE_ID] not in devices:
@@ -179,6 +217,7 @@ class PlayerScoredTrigger(SleeperEventTrigger):
     """Trigger that fires when a starter in a matchup scores a notable change."""
 
     _event_type = EVENT_PLAYER_SCORED
+    _event_schema = _PLAYER_SCORED_EVENT_SCHEMA
     _schema = _PLAYER_SCORED_SCHEMA
 
     @override
@@ -223,6 +262,7 @@ class DraftPickMadeTrigger(_DraftTrigger):
     """Trigger that fires for every pick made in a draft."""
 
     _event_type = EVENT_DRAFT_PICK
+    _event_schema = _DRAFT_PICK_EVENT_SCHEMA
     _schema = _DRAFT_PICK_MADE_SCHEMA
 
     @override
@@ -239,6 +279,7 @@ class OnTheClockTrigger(_DraftTrigger):
     """Trigger that fires when a team comes on the clock, by default yours."""
 
     _event_type = EVENT_DRAFT_ON_THE_CLOCK
+    _event_schema = _ON_THE_CLOCK_EVENT_SCHEMA
     _schema = _ON_THE_CLOCK_SCHEMA
 
     @override

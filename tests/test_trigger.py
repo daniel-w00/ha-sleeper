@@ -41,6 +41,7 @@ from custom_components.sleeper.trigger import (
     DraftPickMadeTrigger,
     OnTheClockTrigger,
     PlayerScoredTrigger,
+    SleeperEventTrigger,
 )
 
 from .conftest import (
@@ -121,6 +122,27 @@ async def async_score(
         SCORING_CHANGES
     )
     await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+
+
+def scored(**data: Any) -> dict[str, Any]:
+    """Return complete player scored event data with some fields replaced."""
+    return {"device_id": None, "is_mine": True, "player": "A", "delta": 6.0, **data}
+
+
+def drafted(**data: Any) -> dict[str, Any]:
+    """Return complete draft event data with some fields replaced.
+
+    The fields of both draft events are included; triggers ignore the rest.
+    """
+    return {
+        "device_id": None,
+        "is_mine": True,
+        "pick": "1.01",
+        "picked_by": None,
+        "player": "X",
+        "team": None,
+        **data,
+    }
 
 
 def league_device(
@@ -286,12 +308,9 @@ async def test_not_triggered_reports(hass: HomeAssistant) -> None:
     remove = await trigger.async_attach_runner(run_action, did_not_trigger)
 
     for data, reason in (
-        ({"device_id": "other"}, "league_not_targeted"),
-        ({"device_id": "league", "is_mine": False, "player": "A"}, "opponent_player"),
-        (
-            {"device_id": "league", "is_mine": True, "player": "A", "delta": 4.0},
-            "change_too_small",
-        ),
+        (scored(device_id="other"), "league_not_targeted"),
+        (scored(device_id="league", is_mine=False), "opponent_player"),
+        (scored(device_id="league", delta=4.0), "change_too_small"),
     ):
         hass.bus.async_fire(EVENT_PLAYER_SCORED, data)
         await hass.async_block_till_done()
@@ -305,9 +324,7 @@ async def test_not_triggered_reports(hass: HomeAssistant) -> None:
         hass, TriggerConfig(TRIGGER_KEY, options={"side": "opponent", "min_delta": 3.0})
     )
     remove = await trigger.async_attach_runner(run_action, did_not_trigger)
-    hass.bus.async_fire(
-        EVENT_PLAYER_SCORED, {"device_id": None, "is_mine": True, "player": "A"}
-    )
+    hass.bus.async_fire(EVENT_PLAYER_SCORED, scored())
     await hass.async_block_till_done()
     assert did_not_trigger.call_args.args[0].reason == "own_player"
     run_action.assert_not_called()
@@ -315,16 +332,45 @@ async def test_not_triggered_reports(hass: HomeAssistant) -> None:
 
     # Without a reporter (e.g. a script), filtered events are simply ignored.
     remove = await trigger.async_attach_runner(run_action)
-    hass.bus.async_fire(
-        EVENT_PLAYER_SCORED, {"device_id": None, "is_mine": True, "player": "A"}
-    )
+    hass.bus.async_fire(EVENT_PLAYER_SCORED, scored())
     await hass.async_block_till_done()
     remove()
 
-    hass.bus.async_fire(EVENT_PLAYER_SCORED, {"device_id": "other"})
+    hass.bus.async_fire(EVENT_PLAYER_SCORED, scored(device_id="other"))
     await hass.async_block_till_done()
     assert did_not_trigger.call_count == 4
     run_action.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("trigger_class", "event_type", "data"),
+    [
+        (PlayerScoredTrigger, EVENT_PLAYER_SCORED, {}),
+        (PlayerScoredTrigger, EVENT_PLAYER_SCORED, scored(delta="6")),
+        (DraftPickMadeTrigger, EVENT_DRAFT_PICK, drafted(player=None)),
+        (OnTheClockTrigger, EVENT_DRAFT_ON_THE_CLOCK, drafted(is_mine="yes")),
+    ],
+)
+async def test_event_fired_by_hand(
+    hass: HomeAssistant,
+    trigger_class: type[SleeperEventTrigger],
+    event_type: str,
+    data: dict[str, Any],
+) -> None:
+    """Test incomplete event data is reported instead of failing the trigger."""
+    config = await trigger_class.async_validate_config(hass, {})
+    trigger = trigger_class(hass, TriggerConfig(event_type, options=config["options"]))
+    run_action = MagicMock()
+    did_not_trigger = MagicMock()
+    remove = await trigger.async_attach_runner(run_action, did_not_trigger)
+
+    hass.bus.async_fire(event_type, data)
+    await hass.async_block_till_done()
+
+    did_not_trigger.assert_called_once()
+    assert did_not_trigger.call_args.args[0].reason == "invalid_event"
+    run_action.assert_not_called()
+    remove()
 
 
 async def test_descriptions_and_translations(
@@ -456,23 +502,12 @@ async def test_draft_not_triggered_reports(hass: HomeAssistant) -> None:
         hass, TriggerConfig(PICK_TRIGGER_KEY, options={"picker": "mine"})
     )
     remove = await trigger.async_attach_runner(run_action, did_not_trigger)
-    hass.bus.async_fire(
-        EVENT_DRAFT_PICK, {"device_id": None, "is_mine": False, "pick": "1.01"}
-    )
+    hass.bus.async_fire(EVENT_DRAFT_PICK, drafted(is_mine=False))
     await hass.async_block_till_done()
     assert did_not_trigger.call_args.args[0] == NotTriggeredInfo(
         "other_team", {"pick": "1.01"}
     )
-    hass.bus.async_fire(
-        EVENT_DRAFT_PICK,
-        {
-            "device_id": None,
-            "is_mine": True,
-            "pick": "1.02",
-            "picked_by": None,
-            "player": "X",
-        },
-    )
+    hass.bus.async_fire(EVENT_DRAFT_PICK, drafted(pick="1.02"))
     await hass.async_block_till_done()
     run_action.assert_called_once()
     assert run_action.call_args.args[1] == "Someone picked X (1.02)"
@@ -482,17 +517,12 @@ async def test_draft_not_triggered_reports(hass: HomeAssistant) -> None:
         hass, TriggerConfig(CLOCK_TRIGGER_KEY, options={"picker": "others"})
     )
     remove = await trigger.async_attach_runner(run_action, did_not_trigger)
-    hass.bus.async_fire(
-        EVENT_DRAFT_ON_THE_CLOCK, {"device_id": None, "is_mine": True, "pick": "1.03"}
-    )
+    hass.bus.async_fire(EVENT_DRAFT_ON_THE_CLOCK, drafted(pick="1.03"))
     await hass.async_block_till_done()
     assert did_not_trigger.call_args.args[0] == NotTriggeredInfo(
         "own_team", {"pick": "1.03"}
     )
-    hass.bus.async_fire(
-        EVENT_DRAFT_ON_THE_CLOCK,
-        {"device_id": None, "is_mine": False, "pick": "1.04", "team": None},
-    )
+    hass.bus.async_fire(EVENT_DRAFT_ON_THE_CLOCK, drafted(is_mine=False, pick="1.04"))
     await hass.async_block_till_done()
     assert run_action.call_count == 2
     assert run_action.call_args.args[1] == "A team is on the clock (1.04)"
