@@ -36,6 +36,9 @@ from .coordinator import (
 from .entity import SleeperLeagueEntity
 from .views import player_picture_path
 
+# The coordinator fetches the data; the sensors only read it.
+PARALLEL_UPDATES = 0
+
 
 @dataclass(kw_only=True, frozen=True)
 class SleeperLeagueSensorEntityDescription(SensorEntityDescription):
@@ -132,7 +135,9 @@ def _opponent_attributes(data: SleeperLeagueData) -> dict[str, Any]:
 
 def _waiver_budget_attributes(data: SleeperLeagueData) -> dict[str, Any]:
     """Return the FAAB budget and how much of it is spent."""
-    if (roster := data.my_roster) is None:
+    if (
+        roster := data.my_roster
+    ) is None or data.league.waiver_type != WAIVER_TYPE_FAAB:
         return {}
     return {
         "budget": data.league.waiver_budget,
@@ -452,9 +457,10 @@ LEAGUE_SENSORS: tuple[SleeperLeagueSensorEntityDescription, ...] = (
         key="waiver_budget_remaining",
         translation_key="waiver_budget_remaining",
         exists_fn=lambda data: data.league.waiver_type == WAIVER_TYPE_FAAB,
+        # Unknown should the league switch away from FAAB later on.
         value_fn=lambda data: (
             None
-            if data.my_roster is None
+            if data.my_roster is None or data.league.waiver_type != WAIVER_TYPE_FAAB
             else data.league.waiver_budget - data.my_roster.waiver_budget_used
         ),
         attributes_fn=_waiver_budget_attributes,
@@ -469,22 +475,35 @@ async def async_setup_entry(
 ) -> None:
     """Set up Sleeper sensors from a config entry."""
     coordinator = entry.runtime_data
-    known_league_ids: set[str] = set()
+    # (league ID, description key) of the sensors added so far
+    added: set[tuple[str, str]] = set()
 
     @callback
     def _async_add_league_sensors() -> None:
-        """Add sensors for leagues that appeared since the last check."""
-        # Entities of a vanished league are removed with its device; forget
-        # the league so it gets entities again should the account rejoin.
-        known_league_ids.intersection_update(coordinator.data.leagues)
-        new_league_ids = set(coordinator.data.leagues) - known_league_ids
-        known_league_ids.update(new_league_ids)
-        async_add_entities(
+        """Add the sensors of new leagues and the ones a league gained.
+
+        A sensor whose ``exists_fn`` only holds later, e.g. once the
+        commissioner switches to FAAB waivers, is added then.
+        """
+        leagues = coordinator.data.leagues
+        # The sensors of a league the account left are removed with its
+        # device; forget them so they are added again should it rejoin. An
+        # empty league list removes no device (see the coordinator), so the
+        # sensors are still there and must not be added a second time.
+        if leagues:
+            added.difference_update(
+                [sensor for sensor in added if sensor[0] not in leagues]
+            )
+        new_sensors = [
             SleeperLeagueSensor(coordinator, description, league_id)
-            for league_id in new_league_ids
+            for league_id, data in leagues.items()
             for description in LEAGUE_SENSORS
-            if description.exists_fn(coordinator.data.leagues[league_id])
+            if (league_id, description.key) not in added and description.exists_fn(data)
+        ]
+        added.update(
+            (sensor.league_id, sensor.entity_description.key) for sensor in new_sensors
         )
+        async_add_entities(new_sensors)
 
     _async_add_league_sensors()
     entry.async_on_unload(coordinator.async_add_listener(_async_add_league_sensors))

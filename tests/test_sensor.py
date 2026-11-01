@@ -19,6 +19,8 @@ from pytest_homeassistant_custom_component.common import (
 from syrupy.assertion import SnapshotAssertion
 
 from custom_components.sleeper.api import (
+    WAIVER_TYPE_FAAB,
+    WAIVER_TYPE_ROLLING,
     SleeperLeague,
     SleeperNotFoundError,
     SleeperPlayer,
@@ -437,6 +439,42 @@ async def test_draft_sensors_without_draft(
     assert hass.states.get("sensor.test_league_on_the_clock") is None
     assert hass.states.get("sensor.test_league_league_status") is not None
     assert hass.states.get("sensor.wombats_league_draft_start") is not None
+
+
+async def test_sensors_a_league_gains_later(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_client: MagicMock,
+    mock_leagues: tuple[SleeperLeague, ...],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test sensors are added once their league gets a draft or FAAB waivers."""
+    test_league, wombats = mock_leagues
+    mock_client.get_user_leagues.return_value = (
+        replace(test_league, draft_id=None),
+        wombats,
+    )
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.test_league_draft_start") is None
+    assert hass.states.get("sensor.test_league_waiver_budget_remaining") is None
+
+    mock_client.get_user_leagues.return_value = (
+        replace(test_league, waiver_type=WAIVER_TYPE_FAAB, waiver_budget=100),
+        replace(wombats, waiver_type=WAIVER_TYPE_ROLLING),
+    )
+    await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
+
+    assert hass.states.get("sensor.test_league_draft_start") is not None
+    state = hass.states.get("sensor.test_league_waiver_budget_remaining")
+    assert state is not None
+    assert state.state == "100"
+    # The other way round the sensor stays, but has no value any more.
+    state = hass.states.get("sensor.wombats_league_waiver_budget_remaining")
+    assert state is not None
+    assert state.state == STATE_UNKNOWN
+    assert state.attributes.get("budget") is None
 
 
 async def test_draft_sensors_when_draft_vanishes(

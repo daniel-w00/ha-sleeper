@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_USERNAME, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.sleeper.api import SleeperConnectionError, SleeperLeague
@@ -137,6 +138,30 @@ async def test_league_removed_and_rejoined(
         )
         is not None
     )
+
+
+async def test_empty_league_list_and_back(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    mock_leagues: tuple[SleeperLeague, ...],
+    freezer: FrozenDateTimeFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test leagues back after an empty list keep their entities, once."""
+    mock_client.get_user_leagues.return_value = ()
+    await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
+    state = hass.states.get("sensor.wombats_league_record")
+    assert state is not None
+    assert state.state == STATE_UNAVAILABLE
+
+    mock_client.get_user_leagues.return_value = mock_leagues
+    await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
+
+    state = hass.states.get("sensor.wombats_league_record")
+    assert state is not None
+    assert state.state != STATE_UNAVAILABLE
+    assert "does not generate unique IDs" not in caplog.text
 
 
 async def test_two_accounts_in_one_league(
