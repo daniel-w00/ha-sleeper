@@ -28,6 +28,17 @@ STORAGE_VERSION = 1
 PLAYERS_KEY: HassKey[SleeperPlayers] = HassKey(f"{DOMAIN}_players")
 
 
+def _store(hass: HomeAssistant, sport: str) -> Store[dict[str, Any]]:
+    """Return the store of a sport's player list."""
+    # The stored copy is a few MB; serialize it off the event loop.
+    return Store(
+        hass,
+        STORAGE_VERSION,
+        f"{DOMAIN}.players_{sport}",
+        serialize_in_event_loop=False,
+    )
+
+
 class SleeperPlayers:
     """Player lookup shared by all config entries of one sport."""
 
@@ -35,13 +46,7 @@ class SleeperPlayers:
         """Initialize the cache. Performs no I/O."""
         self.sport = sport
         self._client = SleeperClient(async_get_clientsession(hass), sport=sport)
-        # The stored copy is a few MB; serialize it off the event loop.
-        self._store: Store[dict[str, Any]] = Store(
-            hass,
-            STORAGE_VERSION,
-            f"{DOMAIN}.players_{sport}",
-            serialize_in_event_loop=False,
-        )
+        self._store = _store(hass, sport)
         self._players: dict[str, SleeperPlayer] = {}
         self._fetched: datetime | None = None
         self._next_attempt: datetime | None = None
@@ -124,3 +129,9 @@ async def async_get_players(hass: HomeAssistant) -> SleeperPlayers:
     players = hass.data[PLAYERS_KEY]
     await players.async_load()
     return players
+
+
+async def async_remove_players(hass: HomeAssistant) -> None:
+    """Forget the shared player cache and delete its stored copy."""
+    hass.data.pop(PLAYERS_KEY, None)
+    await _store(hass, DEFAULT_SPORT).async_remove()

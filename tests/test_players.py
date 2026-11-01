@@ -74,6 +74,33 @@ async def test_download_on_first_setup(
     assert second.runtime_data.players is players
 
 
+async def test_removed_with_the_last_account(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    hass_storage: dict[str, Any],
+) -> None:
+    """Test the stored player list goes when the last account is deleted."""
+    second = MockConfigEntry(
+        domain=DOMAIN,
+        title="Other",
+        unique_id="987654321",
+        data={CONF_USERNAME: "other"},
+    )
+    second.add_to_hass(hass)
+    await hass.config_entries.async_setup(second.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.config_entries.async_remove(init_integration.entry_id)
+    await hass.async_block_till_done()
+    assert STORAGE_KEY in hass_storage
+    assert PLAYERS_KEY in hass.data
+
+    await hass.config_entries.async_remove(second.entry_id)
+    await hass.async_block_till_done()
+    assert STORAGE_KEY not in hass_storage
+    assert PLAYERS_KEY not in hass.data
+
+
 async def test_loaded_from_storage(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,

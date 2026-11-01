@@ -18,7 +18,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN
 from .coordinator import SleeperConfigEntry, SleeperCoordinator
-from .players import async_get_players
+from .players import async_get_players, async_remove_players
 from .views import SleeperPlayerPictureView
 
 _LOGGER = logging.getLogger(__name__)
@@ -82,3 +82,9 @@ def _async_remove_stale_entities(
 async def async_unload_entry(hass: HomeAssistant, entry: SleeperConfigEntry) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: SleeperConfigEntry) -> None:
+    """Delete the stored player list together with the last account."""
+    if not hass.config_entries.async_entries(DOMAIN):
+        await async_remove_players(hass)
