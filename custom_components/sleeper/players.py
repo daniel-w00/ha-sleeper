@@ -57,6 +57,11 @@ class SleeperPlayers:
         """Return a player by ID, ``None`` if unknown."""
         return self._players.get(player_id)
 
+    @property
+    def count(self) -> int:
+        """Return how many players the list has."""
+        return len(self._players)
+
     def name(self, player_id: str) -> str:
         """Return a player's name, falling back to the ID."""
         player = self._players.get(player_id)
