@@ -488,6 +488,7 @@ async def test_get_matchups(
     assert mine.matchup_id == 6
     assert mine.points == 71.66
     assert mine.custom_points is None
+    assert mine.score == 71.66
     assert mine.starters[0] == "11560"
     assert len(mine.players) == 14
     assert mine.starters_points[0] == 17.66
@@ -514,6 +515,7 @@ def test_matchup_bye_week() -> None:
     assert matchup.matchup_id is None
     assert matchup.points == 0
     assert matchup.custom_points == 12.5
+    assert matchup.score == 12.5
     assert matchup.starters == ()
     assert matchup.starters_points == ()
     assert dict(matchup.players_points) == {}

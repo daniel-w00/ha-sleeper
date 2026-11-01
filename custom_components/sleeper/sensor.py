@@ -338,7 +338,7 @@ LEAGUE_SENSORS: tuple[SleeperLeagueSensorEntityDescription, ...] = (
         native_unit_of_measurement=UNIT_POINTS,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
-        value_fn=_matchup_value(lambda matchup: matchup.points),
+        value_fn=_matchup_value(lambda matchup: matchup.score),
         attributes_fn=_matchup_attributes,
     ),
     SleeperLeagueSensorEntityDescription(
@@ -356,7 +356,7 @@ LEAGUE_SENSORS: tuple[SleeperLeagueSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
         value_fn=lambda data: (
-            None if data.opponent_matchup is None else data.opponent_matchup.points
+            None if data.opponent_matchup is None else data.opponent_matchup.score
         ),
         entity_picture_fn=_opponent_picture,
     ),

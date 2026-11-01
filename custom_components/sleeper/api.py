@@ -397,7 +397,8 @@ class SleeperMatchup:
     """One side of a weekly matchup.
 
     Two entries with the same ``matchup_id`` play each other. ``matchup_id`` is
-    ``None`` on a bye week.
+    ``None`` on a bye week. ``points`` are what the players scored,
+    ``custom_points`` the commissioner's correction of them, if any.
     """
 
     roster_id: int
@@ -428,6 +429,11 @@ class SleeperMatchup:
                 {str(key): _float(value) for key, value in players_points.items()}
             ),
         )
+
+    @property
+    def score(self) -> float:
+        """Return the points that count: the commissioner's, if set."""
+        return self.points if self.custom_points is None else self.custom_points
 
 
 @dataclass(frozen=True, slots=True)

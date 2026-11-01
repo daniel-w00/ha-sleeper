@@ -536,7 +536,7 @@ class SleeperLeagueData:
                 projection_total += points
                 remaining += points * share
         return SleeperOutlook(
-            points=matchup.points,
+            points=matchup.score,
             remaining=round(remaining, 2),
             projection=round(projection_total, 2),
             yet_to_play=yet_to_play,
@@ -569,7 +569,9 @@ class SleeperLeagueData:
             return None
         margin = mine.projected - theirs.projected
         projection = mine.projection + theirs.projection
-        to_come = mine.remaining + theirs.remaining
+        # Starters projected below zero (a defense, say) can make this
+        # negative when nobody else is left to play.
+        to_come = max(mine.remaining + theirs.remaining, 0.0)
         spread = (
             MATCHUP_MARGIN_STDDEV * math.sqrt(to_come / projection)
             if projection > 0
@@ -667,7 +669,8 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         self._league_users: dict[str, tuple[SleeperLeagueUser, ...]] = {}
         self._league_season: str | None = None
         self._leagues_refreshed: datetime | None = None
-        self._last_points: dict[tuple[str, int], float] = {}
+        # (league_id, week, roster_id) -> matchup points of the last poll
+        self._last_points: dict[tuple[str, int, int], float] = {}
         # league_id -> draft; draft_id -> its picks and trades
         self._drafts: dict[str, SleeperDraft] = {}
         self._draft_picks: dict[str, tuple[SleeperDraftPick, ...]] = {}
@@ -1283,9 +1286,11 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         not count. The next kickoff of such a game pulls the poll forward.
         Otherwise a running draft polls at the draft interval, and a draft
         scheduled to start before the next poll pulls the poll forward too.
+        Points are compared within a week, so the drop to zero when a new
+        week starts is no activity.
         """
         points = {
-            (league_id, matchup.roster_id): matchup.points
+            (league_id, data.week, matchup.roster_id): matchup.points
             for league_id, data in leagues.items()
             for matchup in (data.my_matchup, data.opponent_matchup)
             if matchup is not None

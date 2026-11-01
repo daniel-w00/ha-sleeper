@@ -341,6 +341,30 @@ async def test_adaptive_interval(
     assert coordinator.update_interval == IDLE_SEASON_UPDATE_INTERVAL
 
 
+@pytest.mark.usefixtures("games_over", "no_running_draft")
+async def test_new_week_is_no_activity(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    mock_sport_state: SleeperSportState,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test the points dropping to zero in a new week keep the idle interval."""
+    coordinator: SleeperCoordinator = init_integration.runtime_data
+    assert coordinator.update_interval == IDLE_SEASON_UPDATE_INTERVAL
+
+    mock_client.get_sport_state.return_value = replace(
+        mock_sport_state, week=mock_sport_state.week + 1
+    )
+    mock_client.get_matchups.side_effect = lambda league_id, week: (
+        _matchups_with_points(0.0) if league_id == LEAGUE_ID else ()
+    )
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+
+    assert coordinator.data.leagues[LEAGUE_ID].week == mock_sport_state.week + 1
+    assert coordinator.update_interval == IDLE_SEASON_UPDATE_INTERVAL
+
+
 @pytest.mark.usefixtures("no_running_draft")
 async def test_offseason_interval(
     hass: HomeAssistant,
@@ -1022,6 +1046,48 @@ def test_win_probability_when_all_games_are_over(
     )
 
     assert data.win_probability == win_probability
+
+
+def test_win_probability_with_negative_projection_left() -> None:
+    """Test a starter projected below zero is the only one still to play."""
+    data = _projected_league(
+        starters={1: ["a1", "a2"], 2: ["b1"]},
+        points={1: 21, 2: 19},
+        projections={"a1": ("KC", 12), "a2": ("BUF", -1), "b1": ("KC", 8)},
+        games=(
+            _game("1", "complete", ("KC", "DEN")),
+            _game("2", "pre_game", ("BUF", "MIA")),
+        ),
+    )
+
+    assert data.my_outlook is not None
+    assert data.my_outlook.remaining == -1
+    # 20 vs 19 projected, with nothing (or less) to come.
+    assert data.win_probability == 100
+
+
+def test_commissioner_points_count() -> None:
+    """Test the commissioner's correction replaces the scored points."""
+    data = _projected_league(
+        starters={1: ["a1"], 2: ["b1"]},
+        points={1: 30, 2: 20},
+        projections={"a1": ("KC", 12), "b1": ("BUF", 8)},
+        games=(
+            _game("1", "complete", ("KC", "DEN")),
+            _game("2", "complete", ("BUF", "MIA")),
+        ),
+    )
+    data = replace(
+        data,
+        matchups=tuple(
+            replace(matchup, custom_points=10.0) if matchup.roster_id == 1 else matchup
+            for matchup in data.matchups
+        ),
+    )
+
+    assert data.my_outlook is not None
+    assert data.my_outlook.projected == 10
+    assert data.win_probability == 0
 
 
 def test_win_probability_without_projections() -> None:
