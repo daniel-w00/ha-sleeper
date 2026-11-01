@@ -48,7 +48,9 @@ rules:
     comment: Coordinator raises UpdateFailed on API errors; league entities are unavailable once the league is gone.
   integration-owner: done
   log-when-unavailable: todo
-  parallel-updates: todo
+  parallel-updates:
+    status: done
+    comment: Read-only sensors fed by the coordinator, PARALLEL_UPDATES = 0.
   reauthentication-flow:
     status: exempt
     comment: The Sleeper API needs no authentication.
@@ -56,7 +58,9 @@ rules:
 
   # Gold
   devices: done
-  diagnostics: todo
+  diagnostics:
+    status: done
+    comment: Summary per league in diagnostics.py; IDs and names are redacted.
   discovery-update-info:
     status: exempt
     comment: Cloud service, nothing to discover.

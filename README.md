@@ -94,7 +94,7 @@ the account device; they are removed on update.)
 | Opponent | Your opponent's team name (or display name). Attributes: roster ID, record. |
 | Last big play | The player of the latest big play in your matchup (see below), with the player's picture. Attributes: player ID, position, team, whether the player is yours, previous points, points, change, week. `unknown` until the first big play after a restart. |
 | Waiver position | Your position in the waiver order. |
-| Waiver budget remaining | Only in FAAB leagues. Attributes: budget, used. |
+| Waiver budget remaining | Only in FAAB leagues; added when a league switches to FAAB, `unknown` when it switches away. Attributes: budget, used. |
 | Draft start | When the draft is scheduled to start (a timestamp, so "in 3 days" on cards and usable in time triggers). Attributes: draft ID, status (`pre_draft`, `drafting`, `paused`, `complete`), type (snake, linear, auction), rounds, teams, pick timer in seconds, your draft slot. |
 | On the clock | The team whose pick it is, with its picture. Attributes: pick number, round, pick in round, pick as `2.06`, roster ID, whether it is yours, the deadline of the pick, whether the draft is paused, picks made and total. |
 | My next pick | How many picks are made before your next one; `0` while you are on the clock. Attributes: pick number, round, pick in round, pick as `2.06`. |
@@ -119,10 +119,13 @@ the two points sensors:
 **Team** shows your team's picture instead of its icon, **Opponent**, **Opponent
 points** and **Opponent projected points** your opponent's, **Last big play** the player's headshot (the team logo for a
 defense). A team picture uploaded for the league is preferred over the
-manager's profile picture; without either, the icon stays. Your browser or the companion app loads
-team pictures and logos directly from Sleeper's image server. Player headshots are wide, so
-Home Assistant fetches them and serves them cropped to a square
-(`/api/sleeper/player_picture/…`); otherwise the round badge shows the head off to the side.
+manager's profile picture; without either, the icon stays. Your browser or the companion app
+loads team pictures and logos directly from Sleeper's image server; a team picture anywhere
+else is ignored, so another manager cannot make your dashboards load images from a server of
+their choice. Player headshots are wide, so Home Assistant fetches them and serves
+them cropped to a square (`/api/sleeper/player_picture/…`); otherwise the round badge shows
+the head off to the side. Browsers load entity pictures without logging in, so this address
+answers without authentication, but only for the players an entity shows at the moment.
 Changed pictures show up with the hourly refresh of the league list.
 
 ### Projections and win probability
@@ -198,6 +201,35 @@ for example from Node-RED or an event trigger. Its data contains `player`, `play
 Sleeper updates points about once a minute, so two quick plays by the same player can
 arrive as one change, and a change of six or more points is usually, but not always, a
 touchdown. Bench players and changes below 3 points never fire.
+
+### Matchup finished: trigger and event
+
+Once a week, when the last game with a starter of either side of your matchup is over, the
+integration fires a `sleeper_matchup_finished` event. The league device's **Activity** feed
+and the logbook show it as, for example, "won 112.4 to 98.1 against Team 2 (week 8, Wombats
+League)". The result is the score at that moment: stat corrections can still change it
+until Sleeper settles the week. A matchup that is already over when Home Assistant starts
+does not fire again. The end of the games comes from the same undocumented API as the game
+clock; while that is down, the event comes late rather than never.
+
+Add a trigger, pick **Sleeper** and choose **Matchup finished**. The **Result** option limits
+it to wins, losses or ties; the optional target works like for Player scored. The action
+receives `trigger.result` (`win`, `loss` or `tie`), `trigger.points`, `trigger.opponent`,
+`trigger.opponent_points`, `trigger.team`, `trigger.week`, `trigger.league` and so on; the
+event has the same data plus `league_id`, `matchup_id`, `user_id` and `device_id`.
+
+```yaml
+triggers:
+  - trigger: sleeper.matchup_finished
+    options:
+      result: win
+actions:
+  - action: notify.mobile_app_phone
+    data:
+      message: >-
+        You beat {{ trigger.opponent }} {{ trigger.points }} to
+        {{ trigger.opponent_points }} in {{ trigger.league }}!
+```
 
 ### Drafts: triggers, events and the activity feed
 
@@ -331,6 +363,8 @@ hour later.
 3. To remove the integration files as well, delete it from HACS (or delete the
    `custom_components/sleeper` folder) and restart Home Assistant.
 
+Deleting the last account also deletes the stored copy of Sleeper's player list.
+
 ## Troubleshooting
 
 Enable debug logging via **Settings → Devices & services → Sleeper → Enable debug logging**,
@@ -342,7 +376,10 @@ logger:
     custom_components.sleeper: debug
 ```
 
-Please attach the log output when [opening an issue](https://github.com/daniel-w00/ha-sleeper/issues).
+Please attach the log output when [opening an issue](https://github.com/daniel-w00/ha-sleeper/issues),
+and the diagnostics if you can: in the three-dot menu of the account, choose **Download
+diagnostics**. They show what the integration knows about your leagues, games and
+projections, without league IDs, user IDs or names.
 
 ## Development
 

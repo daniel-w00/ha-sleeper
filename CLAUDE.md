@@ -47,7 +47,8 @@ core integration.
   names. Add new platforms to `PLATFORMS` in `__init__.py`.
 - Errors: map client exceptions (`SleeperConnectionError`, `SleeperNotFoundError`) to
   `UpdateFailed` in the coordinator and to form errors in the config flow. Never let raw
-  aiohttp exceptions escape `api.py`.
+  aiohttp exceptions escape `api.py`, nor decode errors: every public fetch method of the
+  client gets `@_decodes_answer`, which turns a malformed answer into a connection error.
 - Tests for every change: config flow paths, setup/unload, entity states via
   `hass.states`, client behaviour via `aioclient_mock`. Run `scripts/lint` and
   `scripts/test` before considering work done.
@@ -78,7 +79,7 @@ core integration.
 | dependency-transparency | `manifest.json` has no requirements; client is in-package |
 | brands | `custom_components/sleeper/brand/` (placeholder icons) |
 | docs-* | `README.md` sections Installation, Configuration, Removal |
-| docs-triggers | `README.md` sections Big plays and Drafts, `trigger.py`, `triggers.yaml` |
+| docs-triggers | `README.md` sections Big plays, Matchup finished and Drafts, `trigger.py`, `triggers.yaml` |
 | action-setup, docs-actions, docs-conditions, entity-event-setup | exempt, see `quality_scale.yaml` |
 
 Full checklist: https://developers.home-assistant.io/docs/core/integration-quality-scale/checklist

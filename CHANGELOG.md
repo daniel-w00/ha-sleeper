@@ -6,6 +6,36 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Matchup finished** trigger and `sleeper_matchup_finished` event: once a week, when the
+  last game of your matchup is over, with the result (win, loss or tie) and the score. The
+  activity feed shows it too.
+- Diagnostics: **Download diagnostics** in the account's menu, without IDs and names.
+
+### Changed
+
+- Sensors a league gains later, like **Waiver budget remaining** after a switch to FAAB or
+  the draft sensors of a new draft, are added without a restart. **Waiver budget remaining**
+  turns `unknown` when a league switches away from FAAB.
+- The player picture address only serves the players an entity currently shows.
+- Team pictures that are not on Sleeper's image server are ignored.
+- Deleting the last account also deletes the stored player list.
+
+### Fixed
+
+- An unreadable answer from Sleeper (an error page instead of data, or data of an
+  unexpected shape) no longer makes every entity unavailable when only the projections or
+  game clocks are affected, and no longer downloads the 10 MB player list on every update.
+- **Matchup points**, **Opponent points**, the projections and the win probability use the
+  commissioner's corrected score when there is one.
+- **Win probability** no longer fails when only starters projected below zero are left to
+  play.
+- After Sleeper briefly answered with no leagues, their entities are no longer added a
+  second time (with an error for each in the log).
+- The start of a new week no longer switches to the 60 second interval for half an hour.
+- Triggers ignore incomplete events fired by hand instead of failing.
+
 ## [0.4.0] - 2026-10-27
 
 ### Added
