@@ -19,7 +19,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 from homeassistant.util.hass_dict import HassKey
 
-from .api import SleeperClient, SleeperError, SleeperPlayer
+from .api import SleeperClient, SleeperPlayer
 from .const import DEFAULT_SPORT, DOMAIN, PLAYERS_MAX_AGE, PLAYERS_RETRY_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,7 +88,8 @@ class SleeperPlayers:
         """Download the player list if the copy is older than a day.
 
         A failed download is retried after ``PLAYERS_RETRY_INTERVAL`` so that
-        a Sleeper outage does not cause a 10 MB request on every poll.
+        a Sleeper outage does not cause a 10 MB request on every poll. That
+        holds for any failure, not only the expected ``SleeperError``.
         """
         async with self._lock:
             now = dt_util.utcnow()
@@ -98,7 +99,7 @@ class SleeperPlayers:
                 return
             try:
                 players = await self._client.get_players()
-            except SleeperError:
+            except Exception:
                 self._next_attempt = now + PLAYERS_RETRY_INTERVAL
                 raise
             self._players = players

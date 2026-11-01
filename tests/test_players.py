@@ -22,7 +22,7 @@ from custom_components.sleeper.const import (
     PLAYERS_MAX_AGE,
     PLAYERS_RETRY_INTERVAL,
 )
-from custom_components.sleeper.players import PLAYERS_KEY
+from custom_components.sleeper.players import PLAYERS_KEY, SleeperPlayers
 
 from .conftest import async_poll, load_json_fixture, players_fixture
 
@@ -160,6 +160,27 @@ async def test_download_failure(
     state = hass.states.get("sensor.wombats_league_matchup_points")
     assert state is not None
     assert state.attributes["starters"][0]["player"] == "Caleb Williams"
+
+
+async def test_unexpected_download_failure_waits_too(
+    hass: HomeAssistant,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test a failure other than a SleeperError does not retry on every call."""
+    mock_client.get_players.side_effect = RuntimeError("boom")
+    players = SleeperPlayers(hass, "nfl")
+
+    with pytest.raises(RuntimeError):
+        await players.async_refresh_if_stale()
+    await players.async_refresh_if_stale()
+    mock_client.get_players.assert_awaited_once()
+
+    freezer.tick(PLAYERS_RETRY_INTERVAL)
+    mock_client.get_players.side_effect = None
+    await players.async_refresh_if_stale()
+    assert mock_client.get_players.await_count == 2
+    assert not players.stale
 
 
 async def test_setup_does_not_wait_for_the_download(

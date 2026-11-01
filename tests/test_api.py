@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from aiohttp import ClientError
 from homeassistant.core import HomeAssistant
@@ -136,6 +137,48 @@ async def test_timeout(
 
     with pytest.raises(SleeperConnectionError):
         await client.get_user("testuser")
+
+
+async def test_username_is_one_path_segment(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test a username cannot reach other API paths."""
+    aioclient_mock.get(f"{BASE_URL}/user/..%2Fstate%2Fnfl%3Fx", json=USER_JSON)
+
+    user = await client.get_user("../state/nfl?x")
+
+    assert user.user_id == TEST_USER_ID
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        {"text": "<html>Down for maintenance</html>"},
+        {"content": b"\xff\xfe"},
+        {"json": {"user_id": "1"}},
+        {"json": [1, 2]},
+    ],
+)
+async def test_malformed_answer(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker, answer: dict[str, Any]
+) -> None:
+    """Test an answer that is not JSON, or not of the expected shape."""
+    aioclient_mock.get(f"{BASE_URL}/user/testuser", **answer)
+
+    with pytest.raises(SleeperConnectionError, match="Unexpected answer in get_user"):
+        await client.get_user("testuser")
+
+
+async def test_malformed_player_list(
+    client: SleeperClient, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """Test a player list that cannot be decoded in the executor."""
+    aioclient_mock.get(
+        f"{BASE_URL}/players/nfl?active=true", json={"11560": {"first_name": "C"}}
+    )
+
+    with pytest.raises(SleeperConnectionError, match="get_players"):
+        await client.get_players()
 
 
 async def test_get_sport_state(
@@ -404,10 +447,18 @@ async def test_get_league_users(
 
 
 @pytest.mark.parametrize(
-    "team_avatar", ["javascript:alert(1)", "http://example.com/a.jpg", 42]
+    "team_avatar",
+    [
+        "javascript:alert(1)",
+        "http://sleepercdn.com/uploads/a.jpg",
+        "https://example.com/a.jpg",
+        "https://sleepercdn.com.example.com/a.jpg",
+        "https://[broken/a.jpg",
+        42,
+    ],
 )
 def test_league_user_ignores_unsafe_team_avatar(team_avatar: object) -> None:
-    """Test a team picture that is not an https URL falls back to the avatar."""
+    """Test a team picture not on Sleeper's CDN falls back to the avatar."""
     user = SleeperLeagueUser.from_json(
         {
             "user_id": "1",
@@ -947,6 +998,36 @@ async def test_graphql_null_data(
     aioclient_mock.post(GRAPHQL_URL, json={"data": {"stats_for_players_in_week": None}})
 
     assert await client.get_projections("2026", "regular", 1, []) == {}
+
+
+@pytest.mark.parametrize(
+    ("answer", "match"),
+    [
+        ({"text": "<html>Bad gateway</html>"}, "JSONDecodeError"),
+        ({"json": {"errors": ["Unauthorized"]}}, "AttributeError"),
+        (
+            {
+                "json": {
+                    "data": {
+                        "scores": [{"game_id": "1", "metadata": {"quarter_num": "OT"}}]
+                    }
+                }
+            },
+            "ValueError",
+        ),
+    ],
+)
+async def test_graphql_malformed_answer(
+    client: SleeperClient,
+    aioclient_mock: AiohttpClientMocker,
+    answer: dict[str, Any],
+    match: str,
+) -> None:
+    """Test a GraphQL answer of an unexpected shape maps to a connection error."""
+    aioclient_mock.post(GRAPHQL_URL, **answer)
+
+    with pytest.raises(SleeperConnectionError, match=match):
+        await client.get_games("2026", "regular", 1)
 
 
 async def test_graphql_http_error(

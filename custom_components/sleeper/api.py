@@ -49,13 +49,15 @@ most others, including the app's matchup projections, need a login.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterable, Mapping
+from collections.abc import Awaitable, Callable, Coroutine, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+import functools
 import json
 import logging
 from types import MappingProxyType
 from typing import Any, Self
+from urllib.parse import quote, urlsplit
 
 from aiohttp import ClientError, ClientResponseError, ClientSession
 
@@ -63,7 +65,8 @@ _LOGGER = logging.getLogger(__name__)
 
 BASE_URL = "https://api.sleeper.app/v1"
 GRAPHQL_URL = "https://sleeper.com/graphql"
-AVATAR_URL = "https://sleepercdn.com/avatars"
+CDN_HOST = "sleepercdn.com"
+AVATAR_URL = f"https://{CDN_HOST}/avatars"
 PLAYER_PICTURE_URL = (
     "https://sleepercdn.com/content/{sport}/players/thumb/{player_id}.jpg"
 )
@@ -127,6 +130,40 @@ class SleeperConnectionError(SleeperError):
 
 class SleeperNotFoundError(SleeperError):
     """Raised when the requested resource does not exist."""
+
+
+# What decoding a malformed answer raises: invalid JSON or UTF-8 is a
+# ValueError, JSON of an unexpected shape fails in the models.
+MALFORMED_ANSWER_ERRORS = (
+    ArithmeticError,
+    AttributeError,
+    KeyError,
+    TypeError,
+    ValueError,
+)
+
+
+def _decodes_answer[**P, R](
+    method: Callable[P, Awaitable[R]],
+) -> Callable[P, Coroutine[Any, Any, R]]:
+    """Turn a malformed answer into a connection error.
+
+    Sleeper can answer with an error page instead of JSON, and the GraphQL
+    API is undocumented and may change shape at any time. Callers only
+    handle ``SleeperError``, so such an answer must not surface as a
+    ``KeyError`` from deep inside a model.
+    """
+
+    @functools.wraps(method)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        try:
+            return await method(*args, **kwargs)
+        except MALFORMED_ANSWER_ERRORS as err:
+            raise SleeperConnectionError(
+                f"Unexpected answer in {method.__name__}: {err!r}"
+            ) from err
+
+    return wrapper
 
 
 def _str_tuple(value: list[Any] | None) -> tuple[str, ...]:
@@ -337,12 +374,10 @@ class SleeperLeagueUser:
             display_name=data["display_name"],
             avatar=data.get("avatar"),
             team_name=team_name.strip() if team_name else None,
-            # Other managers control this value; only accept a web image URL.
-            team_avatar=(
-                team_avatar
-                if isinstance(team_avatar, str) and team_avatar.startswith("https://")
-                else None
-            ),
+            # Other managers control this value. Pictures they upload are on
+            # Sleeper's CDN; a URL elsewhere would make every dashboard that
+            # shows it load from a server of their choice.
+            team_avatar=team_avatar if _is_cdn_url(team_avatar) else None,
             is_owner=bool(data.get("is_owner")),
         )
 
@@ -717,6 +752,17 @@ def _avatar_url(avatar_id: str | None) -> str | None:
     return f"{AVATAR_URL}/thumbs/{avatar_id}" if avatar_id else None
 
 
+def _is_cdn_url(value: Any) -> bool:
+    """Return whether a value is an https URL on Sleeper's CDN."""
+    if not isinstance(value, str):
+        return False
+    try:
+        url = urlsplit(value)
+    except ValueError:
+        return False
+    return url.scheme == "https" and url.hostname == CDN_HOST
+
+
 def _optional_str(value: Any) -> str | None:
     """Return the value as a string, or ``None`` if it is missing."""
     return None if value is None else str(value)
@@ -863,13 +909,15 @@ class SleeperClient:
         media_type = "image/png" if picture.startswith(PNG_SIGNATURE) else "image/jpeg"
         return picture, media_type
 
+    @_decodes_answer
     async def get_user(self, username_or_id: str) -> SleeperUser:
         """Fetch a user by username or user ID."""
         data = await self._get_object(
-            f"user/{username_or_id}", f"User {username_or_id!r}"
+            f"user/{quote(username_or_id, safe='')}", f"User {username_or_id!r}"
         )
         return SleeperUser.from_json(data)
 
+    @_decodes_answer
     async def get_sport_state(self) -> SleeperSportState:
         """Fetch the current season/week state for the client's sport."""
         data = await self._get_object(
@@ -877,6 +925,7 @@ class SleeperClient:
         )
         return SleeperSportState.from_json(data)
 
+    @_decodes_answer
     async def get_user_leagues(
         self, user_id: str, season: str
     ) -> tuple[SleeperLeague, ...]:
@@ -884,21 +933,25 @@ class SleeperClient:
         data = await self._get_list(f"user/{user_id}/leagues/{self._sport}/{season}")
         return tuple(SleeperLeague.from_json(item) for item in data)
 
+    @_decodes_answer
     async def get_league(self, league_id: str) -> SleeperLeague:
         """Fetch a single league."""
         data = await self._get_object(f"league/{league_id}", f"League {league_id!r}")
         return SleeperLeague.from_json(data)
 
+    @_decodes_answer
     async def get_rosters(self, league_id: str) -> tuple[SleeperRoster, ...]:
         """Fetch all rosters of a league."""
         data = await self._get_list(f"league/{league_id}/rosters")
         return tuple(SleeperRoster.from_json(item) for item in data)
 
+    @_decodes_answer
     async def get_league_users(self, league_id: str) -> tuple[SleeperLeagueUser, ...]:
         """Fetch all members of a league."""
         data = await self._get_list(f"league/{league_id}/users")
         return tuple(SleeperLeagueUser.from_json(item) for item in data)
 
+    @_decodes_answer
     async def get_players(self) -> dict[str, SleeperPlayer]:
         """Fetch all active players of the sport, keyed by player ID.
 
@@ -913,6 +966,7 @@ class SleeperClient:
             None, _parse_players, text
         )
 
+    @_decodes_answer
     async def get_matchups(
         self, league_id: str, week: int
     ) -> tuple[SleeperMatchup, ...]:
@@ -923,11 +977,13 @@ class SleeperClient:
         data = await self._get_list(f"league/{league_id}/matchups/{week}")
         return tuple(SleeperMatchup.from_json(item) for item in data)
 
+    @_decodes_answer
     async def get_draft(self, draft_id: str) -> SleeperDraft:
         """Fetch a single draft."""
         data = await self._get_object(f"draft/{draft_id}", f"Draft {draft_id!r}")
         return SleeperDraft.from_json(data)
 
+    @_decodes_answer
     async def get_draft_picks(self, draft_id: str) -> tuple[SleeperDraftPick, ...]:
         """Fetch the picks made so far in a draft, in pick order."""
         data = await self._get_list(f"draft/{draft_id}/picks")
@@ -938,6 +994,7 @@ class SleeperClient:
             )
         )
 
+    @_decodes_answer
     async def get_draft_traded_picks(
         self, draft_id: str
     ) -> tuple[SleeperTradedPick, ...]:
@@ -945,6 +1002,7 @@ class SleeperClient:
         data = await self._get_list(f"draft/{draft_id}/traded_picks")
         return tuple(SleeperTradedPick.from_json(item) for item in data)
 
+    @_decodes_answer
     async def get_projections(
         self, season: str, season_type: str, week: int, player_ids: Iterable[str]
     ) -> dict[str, SleeperProjection]:
@@ -966,6 +1024,7 @@ class SleeperClient:
         projections = (SleeperProjection.from_json(item) for item in data)
         return {projection.player_id: projection for projection in projections}
 
+    @_decodes_answer
     async def get_games(
         self, season: str, season_type: str, week: int
     ) -> tuple[SleeperGame, ...]:
