@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import base64
+from collections.abc import AsyncGenerator
 from http import HTTPStatus
-from unittest.mock import patch
+from unittest.mock import ANY, MagicMock, patch
 
 from aiohttp import ClientError
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
 )
@@ -23,13 +25,20 @@ PICTURE = PNG_SIGNATURE + b"headshot"
 
 
 @pytest.fixture
-async def setup_view(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+async def setup_view(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> AsyncGenerator[MagicMock]:
     """Set up the integration, which registers the view.
 
     ``aioclient_mock`` must be requested first so the view gets the session
-    it patches in.
+    it patches in. Every player counts as shown by an entity unless a test
+    says otherwise.
     """
     assert await async_setup_component(hass, DOMAIN, {})
+    with patch(
+        "custom_components.sleeper.views.async_is_pictured", return_value=True
+    ) as is_pictured:
+        yield is_pictured
 
 
 @pytest.mark.usefixtures("setup_view")
@@ -116,6 +125,43 @@ async def test_player_picture_invalid_path(
 
     assert response.status == status
     assert aioclient_mock.call_count == 0
+
+
+async def test_player_picture_not_shown(
+    hass_client_no_auth: ClientSessionGenerator,
+    aioclient_mock: AiohttpClientMocker,
+    setup_view: MagicMock,
+) -> None:
+    """Test a player no entity shows is not requested from the CDN."""
+    setup_view.return_value = False
+    client = await hass_client_no_auth()
+
+    response = await client.get("/api/sleeper/player_picture/nfl/11560")
+
+    assert response.status == HTTPStatus.NOT_FOUND
+    assert aioclient_mock.call_count == 0
+    setup_view.assert_called_once_with(ANY, "nfl", "11560")
+
+
+async def test_player_picture_of_shown_players(
+    aioclient_mock: AiohttpClientMocker,
+    init_integration: MockConfigEntry,
+    hass_client_no_auth: ClientSessionGenerator,
+) -> None:
+    """Test the pictures entities show are served, and no others."""
+    aioclient_mock.get(CDN_URL.format("5189"), content=PICTURE)
+    client = await hass_client_no_auth()
+
+    # The Wombats League's last pick.
+    response = await client.get("/api/sleeper/player_picture/nfl/5189")
+    assert response.status == HTTPStatus.OK
+    for path in (
+        "/api/sleeper/player_picture/nfl/11560",
+        "/api/sleeper/player_picture/nba/5189",
+    ):
+        response = await client.get(path)
+        assert response.status == HTTPStatus.NOT_FOUND
+    assert aioclient_mock.call_count == 1
 
 
 @pytest.mark.usefixtures("setup_view")

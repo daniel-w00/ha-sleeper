@@ -8,9 +8,12 @@ from http import HTTPStatus
 import logging
 
 from aiohttp import ClientSession, hdrs, web
-from homeassistant.helpers.http import HomeAssistantView
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.http import KEY_HASS, HomeAssistantView
 
 from .api import SleeperClient, SleeperConnectionError, SleeperNotFoundError
+from .const import DOMAIN
+from .coordinator import SleeperConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +31,17 @@ CONTENT_SECURITY_POLICY = "default-src 'none'; img-src data:; style-src 'none'"
 def player_picture_path(sport: str, player_id: str) -> str:
     """Return the path of a player's square picture on this instance."""
     return PLAYER_PICTURE_PATH.format(sport=sport, player_id=player_id)
+
+
+@callback
+def async_is_pictured(hass: HomeAssistant, sport: str, player_id: str) -> bool:
+    """Return whether an entity of any account shows a player's picture."""
+    entries: list[SleeperConfigEntry] = hass.config_entries.async_loaded_entries(DOMAIN)
+    return any(
+        entry.runtime_data.sport == sport and player_id in data.pictured_players
+        for entry in entries
+        for data in entry.runtime_data.data.leagues.values()
+    )
 
 
 def square_svg(picture: bytes, media_type: str) -> bytes:
@@ -56,8 +70,9 @@ class SleeperPlayerPictureView(HomeAssistantView):
 
     Browsers load entity pictures without credentials, so the view does not
     require authentication. It only passes on what Sleeper's CDN serves
-    publicly, for numeric player IDs, and remembers the answers, missing
-    pictures included, so it cannot be used to hammer the CDN.
+    publicly, and only requests the pictures of players an entity shows
+    right now; anything else is not found. With the answers remembered,
+    missing pictures included, it cannot be used to hammer the CDN.
     """
 
     url = "/api/sleeper/player_picture/{sport:[a-z]+}/{player_id:[0-9]{1,10}}"
@@ -77,6 +92,8 @@ class SleeperPlayerPictureView(HomeAssistantView):
         if key in self._cache:
             self._cache.move_to_end(key)
             svg = self._cache[key]
+        elif not async_is_pictured(request.app[KEY_HASS], sport, player_id):
+            return web.Response(status=HTTPStatus.NOT_FOUND)
         else:
             client = SleeperClient(self._session, sport=sport)
             try:

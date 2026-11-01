@@ -291,6 +291,19 @@ class SleeperLeagueData:
         return max(self.draft_picks, key=lambda pick: pick.pick_no, default=None)
 
     @property
+    def pictured_players(self) -> frozenset[str]:
+        """Return the players whose pictures the league's entities show."""
+        change, pick = self.last_big_play, self.last_draft_pick
+        return frozenset(
+            player_id
+            for player_id in (
+                None if change is None else change.player_id,
+                None if pick is None else pick.player_id,
+            )
+            if player_id is not None
+        )
+
+    @property
     def next_pick_no(self) -> int | None:
         """Return the number of the pick that is up now.
 
