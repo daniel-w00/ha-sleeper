@@ -722,12 +722,11 @@ async def test_draft_requests(
 
     Both drafts and their trades load with the league list, the finished
     draft's picks once. The running draft is reloaded every poll with its
-    picks and trades.
+    picks and trades, but not twice in a poll that reloads the league list.
     """
     assert mock_client.get_draft.await_args_list == [
         call(DRAFTING_DRAFT_ID),
         call(DRAFT_ID),
-        call(DRAFTING_DRAFT_ID),
     ]
     assert mock_client.get_draft_picks.await_args_list == [
         call(DRAFT_ID),
@@ -736,7 +735,6 @@ async def test_draft_requests(
     assert mock_client.get_draft_traded_picks.await_args_list == [
         call(DRAFTING_DRAFT_ID),
         call(DRAFT_ID),
-        call(DRAFTING_DRAFT_ID),
     ]
 
     mock_client.reset_mock()
@@ -751,14 +749,10 @@ async def test_draft_requests(
     # finished draft is not requested again.
     mock_client.reset_mock()
     await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
-    assert mock_client.get_draft.await_args_list == [
-        call(DRAFTING_DRAFT_ID),
-        call(DRAFTING_DRAFT_ID),
-    ]
+    assert mock_client.get_draft.await_args_list == [call(DRAFTING_DRAFT_ID)]
     assert mock_client.get_draft_picks.await_args_list == [call(DRAFTING_DRAFT_ID)]
     assert mock_client.get_draft_traded_picks.await_args_list == [
-        call(DRAFTING_DRAFT_ID),
-        call(DRAFTING_DRAFT_ID),
+        call(DRAFTING_DRAFT_ID)
     ]
 
 

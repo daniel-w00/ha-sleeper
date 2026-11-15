@@ -487,13 +487,10 @@ async def async_setup_entry(
         """
         leagues = coordinator.data.leagues
         # The sensors of a league the account left are removed with its
-        # device; forget them so they are added again should it rejoin. An
-        # empty league list removes no device (see the coordinator), so the
-        # sensors are still there and must not be added a second time.
-        if leagues:
-            added.difference_update(
-                [sensor for sensor in added if sensor[0] not in leagues]
-            )
+        # device; forget them so they are added again should it rejoin.
+        added.difference_update(
+            [sensor for sensor in added if sensor[0] not in leagues]
+        )
         new_sensors = [
             SleeperLeagueSensor(coordinator, description, league_id)
             for league_id, data in leagues.items()

@@ -734,6 +734,8 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         self._drafts: dict[str, SleeperDraft] = {}
         self._draft_picks: dict[str, tuple[SleeperDraftPick, ...]] = {}
         self._traded_picks: dict[str, tuple[SleeperTradedPick, ...]] = {}
+        # Drafts the league refresh of the running poll has loaded already.
+        self._refreshed_drafts: set[str] = set()
         # draft_id -> time of the last pick, highest pick number and pick on
         # the clock as of the last poll
         self._last_picked: dict[str, datetime | None] = {}
@@ -815,6 +817,14 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             # The entry is being reloaded; until then the poll goes on with
             # the leagues it has.
             return
+        if not leagues and self._leagues:
+            # Far more likely a hiccup than the account leaving every league
+            # at once: keep the leagues and ask again at the next refresh.
+            _LOGGER.debug("Sleeper answered with no leagues, keeping the known ones")
+            self._league_season = state.league_season
+            self._leagues_refreshed = now
+            return
+        self._refreshed_drafts.clear()
         self._league_users = dict(
             await asyncio.gather(
                 *(self._async_refresh_league_members(league) for league in leagues)
@@ -952,9 +962,9 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
     def _async_remove_stale_league_devices(self) -> None:
         """Remove the devices of leagues the account is no longer part of.
 
-        Removing a device also removes its entities. An empty league list is
-        left alone: it is far more likely a hiccup than the account leaving
-        every league at once, and the devices vanish on the next reload.
+        Removing a device also removes its entities. Without any league
+        nothing is removed: an empty list at the first refresh is far more
+        likely a hiccup than the account having left every league at once.
         """
         if not self._leagues:
             return
@@ -997,6 +1007,7 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             _LOGGER.debug("League %s has no draft %s", league.name, league.draft_id)
             return
         self._drafts[league.league_id] = draft
+        self._refreshed_drafts.add(draft.draft_id)
         self._traded_picks[draft.draft_id] = await self.client.get_draft_traded_picks(
             draft.draft_id
         )
@@ -1017,20 +1028,25 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         Until the draft is complete, the draft object is reloaded every poll
         to notice when it starts, pauses and finishes. Once it has started,
         the picks and trades are reloaded too; the poll in which it turns
-        complete fetches the final picks a last time.
+        complete fetches the final picks a last time. What the league refresh
+        of the same poll has just loaded is not requested twice.
         """
         if (draft := self._drafts.get(league.league_id)) is None:
             return None, (), ()
         if draft.status != DRAFT_STATUS_COMPLETE:
-            draft = await self.client.get_draft(draft.draft_id)
-            self._drafts[league.league_id] = draft
+            refreshed = draft.draft_id in self._refreshed_drafts
+            self._refreshed_drafts.discard(draft.draft_id)
+            if not refreshed:
+                draft = await self.client.get_draft(draft.draft_id)
+                self._drafts[league.league_id] = draft
             if draft.status != DRAFT_STATUS_PRE_DRAFT:
                 self._draft_picks[draft.draft_id] = await self.client.get_draft_picks(
                     draft.draft_id
                 )
-                self._traded_picks[
-                    draft.draft_id
-                ] = await self.client.get_draft_traded_picks(draft.draft_id)
+                if not refreshed:
+                    self._traded_picks[
+                        draft.draft_id
+                    ] = await self.client.get_draft_traded_picks(draft.draft_id)
         return (
             draft,
             self._draft_picks.get(draft.draft_id, ()),

@@ -18,6 +18,8 @@ All notable changes to this project are documented here. The format follows
 
 - An empty starting slot has no `player` in the attributes of **Starters out** and
   **Matchup points** instead of the placeholder `0`.
+- When Sleeper briefly answers with no leagues, the leagues keep their data instead of
+  turning unavailable for an hour.
 
 ### Fixed
 

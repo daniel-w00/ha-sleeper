@@ -18,7 +18,11 @@ from custom_components.sleeper.api import (
     SleeperLeague,
     SleeperSportState,
 )
-from custom_components.sleeper.const import DOMAIN, LEAGUE_REFRESH_INTERVAL
+from custom_components.sleeper.const import (
+    DOMAIN,
+    IDLE_SEASON_UPDATE_INTERVAL,
+    LEAGUE_REFRESH_INTERVAL,
+)
 from custom_components.sleeper.coordinator import league_device_identifier
 
 from .conftest import LEAGUE_ID, PREDRAFT_LEAGUE_ID, TEST_USER_ID, async_poll
@@ -96,7 +100,8 @@ async def test_league_removed_and_rejoined(
     entity_id = "sensor.test_league_league_status"
     assert hass.states.get(entity_id) is not None
 
-    # Sleeper answers with an empty list: treated as a hiccup, nothing removed.
+    # Sleeper answers with an empty list: treated as a hiccup, the leagues
+    # stay as they are.
     mock_client.get_user_leagues.return_value = ()
     await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
     assert (
@@ -108,12 +113,16 @@ async def test_league_removed_and_rejoined(
     )
     state = hass.states.get(entity_id)
     assert state is not None
-    assert state.state == STATE_UNAVAILABLE
+    assert state.state == "pre_draft"
+
     # Pictures are read for unavailable entities too; they must not fail.
+    mock_client.get_sport_state.side_effect = SleeperConnectionError("down")
+    await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
     state = hass.states.get("sensor.test_league_team")
     assert state is not None
     assert state.state == STATE_UNAVAILABLE
     assert "entity_picture" not in state.attributes
+    mock_client.get_sport_state.side_effect = None
 
     # The account left the pre-draft league.
     mock_client.get_user_leagues.return_value = mock_leagues[1:]
@@ -153,9 +162,33 @@ async def test_empty_league_list_and_back(
     freezer: FrozenDateTimeFactory,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test leagues back after an empty list keep their entities, once."""
+    """Test an empty league list keeps the leagues, and their devices at a start."""
     mock_client.get_user_leagues.return_value = ()
     await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
+    assert init_integration.runtime_data.data.leagues.keys() == {
+        LEAGUE_ID,
+        PREDRAFT_LEAGUE_ID,
+    }
+    state = hass.states.get("sensor.wombats_league_record")
+    assert state is not None
+    assert state.state == "0-0"
+    # The list is asked for again with the next hourly refresh, not sooner.
+    requests = mock_client.get_user_leagues.await_count
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    assert mock_client.get_user_leagues.await_count == requests
+
+    # After a restart there are no leagues to keep: the entities have no
+    # data, but the devices and with them the entities' settings stay.
+    await hass.config_entries.async_reload(init_integration.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert init_integration.runtime_data.data.leagues == {}
+    assert (
+        dr.async_get(hass).async_get_device_by_identifier(
+            league_device_identifier(TEST_USER_ID, LEAGUE_ID),
+            config_entry_id=init_integration.entry_id,
+        )
+        is not None
+    )
     state = hass.states.get("sensor.wombats_league_record")
     assert state is not None
     assert state.state == STATE_UNAVAILABLE
@@ -165,7 +198,7 @@ async def test_empty_league_list_and_back(
 
     state = hass.states.get("sensor.wombats_league_record")
     assert state is not None
-    assert state.state != STATE_UNAVAILABLE
+    assert state.state == "0-0"
     assert "does not generate unique IDs" not in caplog.text
 
 
