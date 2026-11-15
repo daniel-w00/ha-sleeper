@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-15
+
 ### Added
 
 - Leagues carry over into the next season: last season's league stays until it is renewed,
@@ -129,7 +131,8 @@ All notable changes to this project are documented here. The format follows
 - Development environment (uv venv pinned to Home Assistant 2026.9.2), tests, and CI with
   hassfest and HACS validation.
 
-[Unreleased]: https://github.com/daniel-w00/ha-sleeper/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/daniel-w00/ha-sleeper/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/daniel-w00/ha-sleeper/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/daniel-w00/ha-sleeper/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/daniel-w00/ha-sleeper/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/daniel-w00/ha-sleeper/compare/v0.2.0...v0.3.0
