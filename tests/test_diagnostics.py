@@ -14,6 +14,8 @@ from syrupy.assertion import SnapshotAssertion
 
 from custom_components.sleeper.api import SleeperConnectionError
 
+from .conftest import LEAGUE_ID
+
 
 async def test_diagnostics(
     hass: HomeAssistant,
@@ -35,8 +37,10 @@ async def test_diagnostics_after_a_failed_update(
     init_integration: MockConfigEntry,
     mock_client: MagicMock,
 ) -> None:
-    """Test the diagnostics name the error of the last update."""
-    mock_client.get_sport_state.side_effect = SleeperConnectionError("down")
+    """Test the diagnostics name the error of the last update, without IDs."""
+    mock_client.get_sport_state.side_effect = SleeperConnectionError(
+        f"HTTP 500 for https://api.sleeper.app/v1/league/{LEAGUE_ID}/rosters"
+    )
     await init_integration.runtime_data.async_refresh()
 
     diagnostics = await get_diagnostics_for_config_entry(
@@ -46,4 +50,6 @@ async def test_diagnostics_after_a_failed_update(
     assert diagnostics["last_update_success"] is False
     exception = diagnostics["last_exception"]
     assert isinstance(exception, str)
-    assert "Error communicating with Sleeper: down" in exception
+    assert "Error communicating with Sleeper: HTTP 500 for" in exception
+    assert "/league/**REDACTED**/rosters" in exception
+    assert LEAGUE_ID not in exception

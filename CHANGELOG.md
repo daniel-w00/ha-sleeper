@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- An empty starting slot has no `player` in the attributes of **Starters out** and
+  **Matchup points** instead of the placeholder `0`.
+
+### Fixed
+
+- The last picks of a draft were missing until a restart, with no event for them, when the
+  draft ended just before the hourly league refresh.
+- When Sleeper's projections cannot be loaded for a moment, the projections, the win
+  probability and the 60 second interval during games keep working with the last known
+  values instead of turning `unknown`.
+- The `week` attribute of **Last big play** stays the week of the play after a new week
+  starts.
+- Diagnostics no longer contain league or user IDs in the error of the last update.
+
 ## [0.5.0] - 2026-11-02
 
 ### Added

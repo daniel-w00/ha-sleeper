@@ -895,52 +895,52 @@
       <EntityStateAttribute.FRIENDLY_NAME: 'friendly_name'>: 'Test League Starters out',
       'starters': list([
         dict({
-          'player': '0',
+          'player': None,
           'slot': 'QB',
           'status': 'Empty',
         }),
         dict({
-          'player': '0',
+          'player': None,
           'slot': 'RB',
           'status': 'Empty',
         }),
         dict({
-          'player': '0',
+          'player': None,
           'slot': 'RB',
           'status': 'Empty',
         }),
         dict({
-          'player': '0',
+          'player': None,
           'slot': 'WR',
           'status': 'Empty',
         }),
         dict({
-          'player': '0',
+          'player': None,
           'slot': 'WR',
           'status': 'Empty',
         }),
         dict({
-          'player': '0',
+          'player': None,
           'slot': 'TE',
           'status': 'Empty',
         }),
         dict({
-          'player': '0',
+          'player': None,
           'slot': 'FLEX',
           'status': 'Empty',
         }),
         dict({
-          'player': '0',
+          'player': None,
           'slot': 'FLEX',
           'status': 'Empty',
         }),
         dict({
-          'player': '0',
+          'player': None,
           'slot': 'K',
           'status': 'Empty',
         }),
         dict({
-          'player': '0',
+          'player': None,
           'slot': 'DEF',
           'status': 'Empty',
         }),

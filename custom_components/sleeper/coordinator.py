@@ -107,6 +107,7 @@ class SleeperPointsChange:
     previous: float
     points: float
     is_mine: bool
+    week: int
 
     @property
     def delta(self) -> float:
@@ -128,8 +129,10 @@ class SleeperStarter:
     player: SleeperPlayer | None
 
     @property
-    def name(self) -> str:
+    def name(self) -> str | None:
         """Return the player's name, the ID if unknown, or ``None`` when empty."""
+        if self.is_empty:
+            return None
         if self.player is not None:
             return self.player.name
         return self.player_id
@@ -860,6 +863,8 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
 
         A finished draft never changes, so once it is loaded it is kept and
         not requested again; the picks of a finished draft are fetched once.
+        That holds when the draft finished since the last poll, too: the
+        picks loaded while it was running lack the last ones.
         """
         cached = self._drafts.pop(league.league_id, None)
         if league.draft_id is None:
@@ -880,10 +885,7 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         self._traded_picks[draft.draft_id] = await self.client.get_draft_traded_picks(
             draft.draft_id
         )
-        if (
-            draft.status == DRAFT_STATUS_COMPLETE
-            and draft.draft_id not in self._draft_picks
-        ):
+        if draft.status == DRAFT_STATUS_COMPLETE:
             self._draft_picks[draft.draft_id] = await self.client.get_draft_picks(
                 draft.draft_id
             )
@@ -960,8 +962,9 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         cached, so they are kept and only requested again when they can have
         changed; see ``_games_due`` and ``_projections_due``. One request
         covers the starters of both sides of the account's matchups in all
-        leagues. When a request fails, the projections are unknown for this
-        poll and it is retried on the next one; the rest of the data is good.
+        leagues. When a request fails, the poll goes on with what is kept
+        (nothing, if the week's games were never loaded) and the request is
+        retried on the next one; the rest of the data is good.
         """
         starters = {
             player_id
@@ -994,7 +997,7 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             if not self._projections_failed:
                 _LOGGER.warning("Could not load the Sleeper projections: %s", err)
                 self._projections_failed = True
-            return leagues
+            return cached
         if self._projections_failed:
             _LOGGER.info("Sleeper projections are available again")
             self._projections_failed = False
@@ -1152,6 +1155,7 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
                             previous=previous,
                             points=points,
                             is_mine=matchup is data.my_matchup,
+                            week=data.week,
                         )
                     )
             if changes:

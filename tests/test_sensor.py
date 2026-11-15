@@ -142,7 +142,7 @@ async def test_sensor_values(
     assert out is not None
     assert out.attributes["starters"][0] == {
         "slot": "QB",
-        "player": "0",
+        "player": None,
         "status": "Empty",
     }
 
@@ -296,6 +296,16 @@ async def test_last_big_play(
     assert state.attributes["entity_picture"] == (
         "https://sleepercdn.com/images/team_logos/nfl/pit.png"
     )
+
+    # The play is still shown in the next week, as a play of its own week.
+    mock_client.get_sport_state.return_value = replace(
+        mock_client.get_sport_state.return_value, week=2
+    )
+    await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.attributes["player"] == "Pittsburgh Steelers"
+    assert state.attributes["week"] == 1
 
 
 async def test_sensors_without_own_roster(

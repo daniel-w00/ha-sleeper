@@ -159,7 +159,7 @@ def _last_big_play_attributes(data: SleeperLeagueData) -> dict[str, Any]:
         "previous_points": change.previous,
         "points": change.points,
         "delta": change.delta,
-        "week": data.week,
+        "week": change.week,
     }
 
 

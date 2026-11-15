@@ -452,7 +452,7 @@ def test_starters_without_player_list() -> None:
     )
     data = _league_data((roster,))
 
-    assert [starter.name for starter in data.my_starters] == ["7", "0"]
+    assert [starter.name for starter in data.my_starters] == ["7", None]
     # Slots beyond the league's roster positions are unknown.
     assert [starter.slot for starter in data.my_starters] == ["?", "?"]
     assert [starter.status for starter in data.starters_out] == ["Empty"]
@@ -719,6 +719,46 @@ async def test_draft_requests(
     ]
 
 
+async def test_draft_finishing_at_the_league_refresh(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test the last picks load when the league refresh finds the draft over.
+
+    The refresh runs before the poll's own draft request, which then skips
+    the finished draft: the picks kept from the running draft must not count
+    as the finished draft's.
+    """
+    coordinator: SleeperCoordinator = init_integration.runtime_data
+    assert len(coordinator.data.leagues[PREDRAFT_LEAGUE_ID].draft_picks) == 5
+
+    mock_client.get_draft.side_effect = lambda draft_id: replace(
+        draft_for(draft_id), status="complete"
+    )
+    mock_client.get_draft_picks.side_effect = lambda draft_id: (
+        drafting_picks(60)
+        if draft_id == DRAFTING_DRAFT_ID
+        else draft_picks_for(draft_id)
+    )
+    mock_client.reset_mock()
+    await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
+
+    data = coordinator.data.leagues[PREDRAFT_LEAGUE_ID]
+    assert data.draft is not None
+    assert data.draft.status == "complete"
+    assert len(data.draft_picks) == 60
+    assert [pick.pick_no for pick in data.new_draft_picks] == list(range(6, 61))
+    assert mock_client.get_draft_picks.await_args_list == [call(DRAFTING_DRAFT_ID)]
+
+    # Now it is kept like any finished draft.
+    mock_client.reset_mock()
+    await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
+    mock_client.get_draft.assert_not_awaited()
+    mock_client.get_draft_picks.assert_not_awaited()
+
+
 @pytest.mark.usefixtures("games_over")
 async def test_league_without_draft(
     hass: HomeAssistant,
@@ -897,7 +937,7 @@ async def test_projections_failure_and_recovery(
     freezer: FrozenDateTimeFactory,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Test failing projections leave the rest of the poll intact."""
+    """Test failing projections leave the poll intact and keep what was loaded."""
     coordinator: SleeperCoordinator = init_integration.runtime_data
 
     mock_client.get_games.side_effect = SleeperConnectionError("graphql down")
@@ -906,17 +946,38 @@ async def test_projections_failure_and_recovery(
     assert coordinator.last_update_success is True
     wombats = coordinator.data.leagues[LEAGUE_ID]
     assert wombats.my_matchup is not None
-    assert wombats.my_outlook is None
-    assert wombats.win_probability is None
+    assert wombats.my_outlook is not None
+    assert wombats.win_probability == 98.7
     assert caplog.text.count("Could not load the Sleeper projections") == 1
     state = hass.states.get("sensor.wombats_league_win_probability")
     assert state is not None
-    assert state.state == "unknown"
+    assert state.state == "98.7"
 
     mock_client.get_games.side_effect = None
     await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
     assert "Sleeper projections are available again" in caplog.text
     assert coordinator.data.leagues[LEAGUE_ID].win_probability == 98.7
+
+
+async def test_projections_failure_from_the_start(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test projections that never loaded are unknown, and the setup succeeds."""
+    mock_client.get_games.side_effect = SleeperConnectionError("graphql down")
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    wombats = mock_config_entry.runtime_data.data.leagues[LEAGUE_ID]
+    assert wombats.my_matchup is not None
+    assert wombats.my_outlook is None
+    assert wombats.win_probability is None
+    state = hass.states.get("sensor.wombats_league_win_probability")
+    assert state is not None
+    assert state.state == "unknown"
 
 
 async def test_no_projections_without_matchup(

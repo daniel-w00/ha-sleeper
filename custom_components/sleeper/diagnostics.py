@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import re
 from typing import Any
 
-from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.components.diagnostics import REDACTED, async_redact_data
 from homeassistant.core import HomeAssistant
 
 from .api import SleeperGame, SleeperMatchup
@@ -14,6 +15,9 @@ from .coordinator import SleeperConfigEntry, SleeperLeagueData
 # Sleeper data is public: an ID or a name is enough to look up the account,
 # its leagues and everyone in them.
 TO_REDACT = {"league_id", "name", "user_id"}
+# Error messages quote the address that failed, which has such an ID in it.
+# Sleeper's IDs are long numbers; HTTP statuses and the like are short.
+ID_PATTERN = re.compile(r"\d{6,}")
 
 
 async def async_get_config_entry_diagnostics(
@@ -30,7 +34,9 @@ async def async_get_config_entry_diagnostics(
                 else coordinator.update_interval.total_seconds()
             ),
             "last_update_success": coordinator.last_update_success,
-            "last_exception": None if exception is None else repr(exception),
+            "last_exception": (
+                None if exception is None else ID_PATTERN.sub(REDACTED, repr(exception))
+            ),
             "players": {
                 "known": coordinator.players.count,
                 "stale": coordinator.players.stale,
