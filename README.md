@@ -64,6 +64,12 @@ All leagues of the account in the current season are added automatically. If you
 want a league in Home Assistant, disable its device under
 **Settings → Devices & services → Sleeper**.
 
+A league carries over into the next season. After the season, last season's league stays
+(with its final standings) until the commissioner renews it; the renewed league then takes
+over the device and its entities, so entity IDs, history, your settings and automations
+keep working. A league that has not been renewed when the next regular season starts is
+removed, as is a league you left.
+
 ## Entities
 
 The integration creates one **account device** and one **device per league** of that

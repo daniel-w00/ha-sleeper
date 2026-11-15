@@ -11,6 +11,9 @@ polling any endpoint faster than that never yields newer data.
 Observed behaviour that the documentation does not mention:
 
 - Unknown users and leagues are answered with HTTP 200 and a ``null`` body.
+- A league gets a new ID every season. The renewed league names the one it
+  continues in ``previous_league_id``; until the commissioner renews it, the
+  league is only in the list of the season before.
 - Team defenses use the team abbreviation (e.g. ``"PIT"``) as player ID.
 - A roster on a bye week has ``matchup_id: null`` in the matchups list.
 - Roster records and season points only update once a week is finalised;
@@ -217,11 +220,17 @@ class SleeperSportState:
             season=str(data["season"]),
             season_type=data["season_type"],
             display_week=int(data.get("display_week", data["week"])),
-            league_season=str(data.get("league_season", data["season"])),
+            # A year; ``previous_league_season`` counts back from it.
+            league_season=str(int(data.get("league_season", data["season"]))),
             leg=int(data.get("leg", data["week"])),
             season_start_date=data.get("season_start_date"),
             season_has_scores=bool(data.get("season_has_scores", False)),
         )
+
+    @property
+    def previous_league_season(self) -> str:
+        """Return the league season before the active one."""
+        return str(int(self.league_season) - 1)
 
 
 @dataclass(frozen=True, slots=True)

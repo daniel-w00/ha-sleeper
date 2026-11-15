@@ -11,10 +11,10 @@ import math
 from types import MappingProxyType
 from typing import TYPE_CHECKING, override
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import ATTR_DEVICE_ID
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -695,6 +695,10 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
     league. The league list, league members and the user profile are cheap
     to keep but change rarely, so they are refreshed only hourly or when
     Sleeper moves to a new league season.
+
+    A league gets a new ID every season. Its device and entities are kept
+    across seasons: until the league is renewed, last season's league stays,
+    and the renewed league takes over its device.
     """
 
     config_entry: SleeperConfigEntry
@@ -805,8 +809,12 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
         """Reload the user profile, the league list and the league members."""
         self._user, leagues = await asyncio.gather(
             self.client.get_user(self.user_id),
-            self.client.get_user_leagues(self.user_id, state.league_season),
+            self._async_fetch_leagues(state),
         )
+        if self._async_migrate_renewed_leagues(leagues):
+            # The entry is being reloaded; until then the poll goes on with
+            # the leagues it has.
+            return
         self._league_users = dict(
             await asyncio.gather(
                 *(self._async_refresh_league_members(league) for league in leagues)
@@ -819,6 +827,87 @@ class SleeperCoordinator(DataUpdateCoordinator[SleeperData]):
             "Loaded %d leagues for season %s", len(leagues), state.league_season
         )
         self._async_remove_stale_league_devices()
+
+    async def _async_fetch_leagues(
+        self, state: SleeperSportState
+    ) -> tuple[SleeperLeague, ...]:
+        """Fetch the leagues of the league season and the ones not renewed yet.
+
+        Sleeper moves to the next league season months before most
+        commissioners renew their league. Until then a league is missing
+        from the new season's list, so last season's league is kept in its
+        place. Once the new season is being played, a league that was not
+        renewed is over, and only the season's own leagues count.
+        """
+        if (
+            state.season_type in SCORING_SEASON_TYPES
+            and state.season == state.league_season
+        ):
+            return await self.client.get_user_leagues(self.user_id, state.league_season)
+        leagues, previous = await asyncio.gather(
+            self.client.get_user_leagues(self.user_id, state.league_season),
+            self.client.get_user_leagues(self.user_id, state.previous_league_season),
+        )
+        renewed = {league.league_id for league in leagues} | {
+            league.previous_league_id for league in leagues
+        }
+        return (
+            *leagues,
+            *(league for league in previous if league.league_id not in renewed),
+        )
+
+    @callback
+    def _async_migrate_renewed_leagues(
+        self, leagues: tuple[SleeperLeague, ...]
+    ) -> bool:
+        """Hand the devices of last season's leagues over to the renewed ones.
+
+        The device and its entities are identified by the league ID, which
+        is new every season. Moving them to the new ID keeps entity IDs,
+        history, settings and everything that refers to the device. It only
+        follows one renewal: a league renewed twice while Home Assistant was
+        not running starts with a new device.
+
+        Entities that are set up cannot change their league, so while the
+        entry is loaded it is reloaded instead and the hand-over happens in
+        the first refresh of the new setup. Returns whether that is the case.
+        """
+        device_registry = dr.async_get(self.hass)
+        entity_registry = er.async_get(self.hass)
+        entry_id = self.config_entry.entry_id
+        for league in leagues:
+            if (previous_id := league.previous_league_id) is None:
+                continue
+            identifier = league_device_identifier(self.user_id, league.league_id)
+            device = device_registry.async_get_device_by_identifier(
+                league_device_identifier(self.user_id, previous_id),
+                config_entry_id=entry_id,
+            )
+            if device is None or device_registry.async_get_device_by_identifier(
+                identifier, config_entry_id=entry_id
+            ):
+                continue
+            if self.config_entry.state is ConfigEntryState.LOADED:
+                _LOGGER.debug("League %s was renewed, reloading", league.name)
+                self.hass.config_entries.async_schedule_reload(entry_id)
+                return True
+            _LOGGER.debug("Moving the device of league %s to its renewal", league.name)
+            device_registry.async_update_device(device.id, new_identifiers={identifier})
+            old_prefix = f"{self.user_id}_{previous_id}_"
+            new_prefix = f"{self.user_id}_{league.league_id}_"
+            for entity in er.async_entries_for_device(
+                entity_registry, device.id, include_disabled_entities=True
+            ):
+                # Other integrations can attach entities to the device.
+                if entity.platform == DOMAIN and entity.unique_id.startswith(
+                    old_prefix
+                ):
+                    entity_registry.async_update_entity(
+                        entity.entity_id,
+                        new_unique_id=new_prefix
+                        + entity.unique_id.removeprefix(old_prefix),
+                    )
+        return False
 
     async def _async_refresh_league_members(
         self, league: SleeperLeague

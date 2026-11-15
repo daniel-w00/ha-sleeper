@@ -61,6 +61,11 @@ core integration.
 
 ## Open design notes
 
+- A league has a new ID every season. The coordinator keeps last season's league until it
+  is renewed (off-season only) and moves its device and entity unique IDs to the renewed
+  league (`previous_league_id`), reloading the entry when that happens at runtime. Do not
+  key anything persistent on a league ID without handling this hand-over.
+
 - The account device has no entities. The NFL week/season/season type sensors were removed
   on 2026-09-15 (sport-wide, duplicated per account, available as attributes); `__init__.py`
   deletes their registry entries on setup. Sport-wide data, if phase 2 adds any (trending

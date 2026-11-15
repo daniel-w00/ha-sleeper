@@ -414,8 +414,11 @@ async def test_league_refresh(
     )
     mock_client.get_user_leagues.return_value = mock_leagues
     await async_poll(hass, freezer, IDLE_SEASON_UPDATE_INTERVAL)
-    assert mock_client.get_user_leagues.await_count == 3
-    mock_client.get_user_leagues.assert_awaited_with(TEST_USER_ID, "2027")
+    # Last season's list is asked for too, for leagues not renewed yet.
+    assert mock_client.get_user_leagues.await_args_list[2:] == [
+        call(TEST_USER_ID, "2027"),
+        call(TEST_USER_ID, "2026"),
+    ]
     assert set(coordinator.data.leagues) == {LEAGUE_ID, PREDRAFT_LEAGUE_ID}
 
 

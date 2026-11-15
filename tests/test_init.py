@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from unittest.mock import MagicMock
 
 from freezegun.api import FrozenDateTimeFactory
@@ -12,7 +13,11 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.sleeper.api import SleeperConnectionError, SleeperLeague
+from custom_components.sleeper.api import (
+    SleeperConnectionError,
+    SleeperLeague,
+    SleeperSportState,
+)
 from custom_components.sleeper.const import DOMAIN, LEAGUE_REFRESH_INTERVAL
 from custom_components.sleeper.coordinator import league_device_identifier
 
@@ -162,6 +167,165 @@ async def test_empty_league_list_and_back(
     assert state is not None
     assert state.state != STATE_UNAVAILABLE
     assert "does not generate unique IDs" not in caplog.text
+
+
+RENEWED_LEAGUE_ID = "1500000000000000000"
+
+
+def _leagues_by_season(
+    mock_client: MagicMock, seasons: dict[str, tuple[SleeperLeague, ...]]
+) -> None:
+    """Make the client answer with the leagues of the season asked for."""
+    mock_client.get_user_leagues.side_effect = lambda user_id, season: seasons.get(
+        season, ()
+    )
+
+
+async def test_league_carried_into_the_next_season(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_client: MagicMock,
+    mock_leagues: tuple[SleeperLeague, ...],
+    mock_sport_state: SleeperSportState,
+    device_registry: dr.DeviceRegistry,
+    entity_registry: er.EntityRegistry,
+    freezer: FrozenDateTimeFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Test a league keeps its device and entities across the season change."""
+    entity_id = "sensor.wombats_league_league_status"
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    device = device_registry.async_get_device_by_identifier(
+        league_device_identifier(TEST_USER_ID, LEAGUE_ID),
+        config_entry_id=mock_config_entry.entry_id,
+    )
+    assert device is not None
+    # An entity another integration attached to the device is left alone.
+    helper = entity_registry.async_get_or_create(
+        "sensor", "template", "helper", device_id=device.id
+    )
+
+    # Sleeper moves on to the next league season. Nobody has renewed a
+    # league yet: last season's leagues stay.
+    mock_client.get_sport_state.return_value = replace(
+        mock_sport_state, season_type="off", league_season="2027"
+    )
+    _leagues_by_season(mock_client, {"2026": mock_leagues})
+    await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
+    assert mock_config_entry.runtime_data.data.leagues.keys() == {
+        LEAGUE_ID,
+        PREDRAFT_LEAGUE_ID,
+    }
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "in_season"
+
+    # The commissioner renews one league: it takes over the device and the
+    # entities of its predecessor, the other league is still last season's.
+    renewed = replace(
+        mock_leagues[1],
+        league_id=RENEWED_LEAGUE_ID,
+        previous_league_id=LEAGUE_ID,
+        season="2027",
+        status="pre_draft",
+        draft_id=None,
+    )
+    _leagues_by_season(mock_client, {"2026": mock_leagues, "2027": (renewed,)})
+    await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+    assert mock_config_entry.runtime_data.data.leagues.keys() == {
+        RENEWED_LEAGUE_ID,
+        PREDRAFT_LEAGUE_ID,
+    }
+    assert (
+        device_registry.async_get_device_by_identifier(
+            league_device_identifier(TEST_USER_ID, LEAGUE_ID),
+            config_entry_id=mock_config_entry.entry_id,
+        )
+        is None
+    )
+    moved = device_registry.async_get_device_by_identifier(
+        league_device_identifier(TEST_USER_ID, RENEWED_LEAGUE_ID),
+        config_entry_id=mock_config_entry.entry_id,
+    )
+    assert moved is not None
+    assert moved.id == device.id
+    assert moved.configuration_url == f"https://sleeper.com/leagues/{RENEWED_LEAGUE_ID}"
+    entry = entity_registry.async_get(entity_id)
+    assert entry is not None
+    assert entry.device_id == device.id
+    assert entry.unique_id == f"{TEST_USER_ID}_{RENEWED_LEAGUE_ID}_league_status"
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "pre_draft"
+    assert state.attributes["season"] == "2027"
+    assert hass.states.get(f"{entity_id}_2") is None
+    assert entity_registry.async_get(helper.entity_id) == helper
+    assert hass.states.get("sensor.test_league_league_status") is not None
+    assert "does not generate unique IDs" not in caplog.text
+
+    # The new season is played: the league nobody renewed is over.
+    mock_client.get_sport_state.return_value = replace(
+        mock_sport_state, season="2027", league_season="2027"
+    )
+    await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
+    assert mock_config_entry.runtime_data.data.leagues.keys() == {RENEWED_LEAGUE_ID}
+    assert hass.states.get("sensor.test_league_league_status") is None
+    assert hass.states.get(entity_id) is not None
+
+
+async def test_renewed_league_with_a_device_of_its_own(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    mock_leagues: tuple[SleeperLeague, ...],
+    device_registry: dr.DeviceRegistry,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Test a renewed league that has a device already does not take another.
+
+    Without a device of the predecessor there is nothing to hand over, and
+    with both devices the predecessor's is left to be removed.
+    """
+    renewed = replace(
+        mock_leagues[0], league_id=RENEWED_LEAGUE_ID, previous_league_id="1"
+    )
+    mock_client.get_user_leagues.return_value = (*mock_leagues, renewed)
+    await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
+    device = device_registry.async_get_device_by_identifier(
+        league_device_identifier(TEST_USER_ID, RENEWED_LEAGUE_ID),
+        config_entry_id=init_integration.entry_id,
+    )
+    assert device is not None
+
+    mock_client.get_user_leagues.return_value = (
+        mock_leagues[1],
+        replace(renewed, previous_league_id=PREDRAFT_LEAGUE_ID),
+    )
+    await async_poll(hass, freezer, LEAGUE_REFRESH_INTERVAL)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert init_integration.runtime_data.data.leagues.keys() == {
+        LEAGUE_ID,
+        RENEWED_LEAGUE_ID,
+    }
+    assert (
+        device_registry.async_get_device_by_identifier(
+            league_device_identifier(TEST_USER_ID, RENEWED_LEAGUE_ID),
+            config_entry_id=init_integration.entry_id,
+        )
+        == device
+    )
+    assert (
+        device_registry.async_get_device_by_identifier(
+            league_device_identifier(TEST_USER_ID, PREDRAFT_LEAGUE_ID),
+            config_entry_id=init_integration.entry_id,
+        )
+        is None
+    )
 
 
 async def test_two_accounts_in_one_league(

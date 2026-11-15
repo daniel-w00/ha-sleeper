@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Leagues carry over into the next season: last season's league stays until it is renewed,
+  and the renewed league keeps the device, the entities and their history. Before, the
+  entities were unavailable or removed after the season and created anew for the renewed
+  league.
 - **Starters out** counts starters whose team has a bye this week, with the reason `Bye`.
 
 ### Changed
