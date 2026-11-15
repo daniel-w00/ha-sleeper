@@ -4,190 +4,67 @@
 [![Validate](https://github.com/daniel-w00/ha-sleeper/actions/workflows/validate.yml/badge.svg)](https://github.com/daniel-w00/ha-sleeper/actions/workflows/validate.yml)
 [![CI](https://github.com/daniel-w00/ha-sleeper/actions/workflows/ci.yml/badge.svg)](https://github.com/daniel-w00/ha-sleeper/actions/workflows/ci.yml)
 
-A Home Assistant custom integration for [Sleeper](https://sleeper.com/) fantasy football.
-It reads your leagues, rosters and matchups from the public Sleeper API and exposes them as
-Home Assistant entities, so you can build dashboards and automations around your fantasy
-season: get notified when your matchup score changes, show the current week on a wall
-tablet, or flash the lights when you take the lead.
+Unofficial Home Assistant integration for [Sleeper](https://sleeper.com/) fantasy football
+(NFL). Standings, live matchup scores, projections, win probability, waivers and drafts of
+all your leagues, plus triggers for big plays, finished matchups and draft picks.
 
-It is an unofficial, community-built integration and is not made, endorsed or supported by
-Sleeper — see [Disclaimer](#disclaimer).
-
-> **Status:** early development. Standings, live matchup scores with player names,
-> projections and win probability, scoring events, waiver information and slow drafts of
-> all your leagues are available;
-> transactions and playoffs are planned.
-
-## Prerequisites
-
-- Home Assistant 2026.9 or newer.
-- A Sleeper account. Only the **username** is needed. Sleeper's API is public and
-  read-only, so no password, token or login is required.
+Only your Sleeper **username** is needed; the API is public and read-only.
+Requires Home Assistant 2026.9 or newer.
 
 ## Installation
 
-### HACS (recommended)
-
 [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=daniel-w00&repository=ha-sleeper&category=integration)
 
-The button opens this repository in your own Home Assistant, where you can download it with
-**Download**. Confirm adding it as a custom repository if you are asked, then restart Home
-Assistant.
-
-Without the button:
-
-1. In Home Assistant open **HACS**.
-2. Open the three-dot menu in the top right and choose **Custom repositories**.
-3. Add `https://github.com/daniel-w00/ha-sleeper` with category **Integration**.
-4. Search for **Sleeper** in HACS and download it.
-5. Restart Home Assistant.
-
-### Manual
-
-1. Copy the `custom_components/sleeper` folder of this repository into the
-   `custom_components` folder of your Home Assistant configuration directory.
-2. Restart Home Assistant.
+Or add `https://github.com/daniel-w00/ha-sleeper` as a custom repository (category
+**Integration**) in HACS, download **Sleeper** and restart Home Assistant.
 
 ## Configuration
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=sleeper)
 
-1. Go to **Settings → Devices & services** (or use the button above).
-2. Select **Add integration** and search for **Sleeper**.
-3. Enter your Sleeper username and submit.
+**Settings → Devices & services → Add integration → Sleeper**, then enter your username.
+Add the integration once per account you want to follow.
 
-Each Sleeper account is added once. Adding the same account again is refused. To follow
-several accounts (for example every member of your household) add the integration once
-per account.
-
-All leagues of the account in the current season are added automatically. If you do not
-want a league in Home Assistant, disable its device under
-**Settings → Devices & services → Sleeper**.
-
-A league carries over into the next season. After the season, last season's league stays
-(with its final standings) until the commissioner renews it; the renewed league then takes
-over the device and its entities, so entity IDs, history, your settings and automations
-keep working. A league that has not been renewed when the next regular season starts is
-removed, as is a league you left.
+All leagues of the current season are added automatically, each as its own device. Disable
+a league's device if you don't want it. When the commissioner renews a league for the next
+season, the new league takes over the existing device and entities.
 
 ## Entities
 
-The integration creates one **account device** and one **device per league** of that
-account. The account device groups the leagues and has no entities of its own; entity IDs
-follow the pattern `sensor.<league>_<name>`. If two accounts share a league, each gets its
-own league device; the second account's entity IDs get a `_2` suffix.
-
-The current NFL week is an attribute of **Matchup points** and the season an attribute of
-**League status**, so a "new week" automation is a state trigger on Matchup points with
-`attribute: week`. (Versions before 0.2.0 had NFL week, season and season type sensors on
-the account device; they are removed on update.)
-
-### League
+Per league:
 
 | Entity | Description |
 |---|---|
-| League status | `pre_draft`, `drafting`, `in_season` or `complete`. Attributes: season, number of teams, playoff start week, playoff teams, scoring format (PPR, half PPR, standard). |
-| Team | Your team name (or display name) in the league, with your team's picture. |
-| Record | Your record as `W-L` or `W-L-T`. Attributes: wins, losses, ties as numbers for automations. |
-| Rank | Your position in the standings (win percentage, then points for). |
-| Points for, Points against | Season totals. Updated by Sleeper once a week is final. |
-| Matchup points | Your live points in this week's matchup. Attributes: week, matchup ID, and your starters with slot, name and points. |
-| Starters out | Number of your starters not expected to play: injury status Out, Doubtful, IR, PUP, suspended or similar, inactive players, players whose team has a bye this week, and empty slots. Attribute: the affected starters with slot and reason (`Bye` for a bye week, `Empty` for an empty slot). Questionable players are not counted. Bye weeks are known while you have a matchup and the week still has games to play. |
-| Opponent points | Your opponent's live points. |
-| Projected points | The points you are projected to end the week with: your live points plus what your starters are still expected to score (see below). Attributes: remaining points, pre-game projection of the whole line-up, starters yet to play, starters playing. |
-| Opponent projected points | The same for your opponent. |
-| Win probability | Your chance to win this week's matchup, in percent. |
-| Opponent | Your opponent's team name (or display name). Attributes: roster ID, record. |
-| Last big play | The player of the latest big play in your matchup (see below), with the player's picture. Attributes: player ID, position, team, whether the player is yours, previous points, points, change, week. `unknown` until the first big play after a restart. |
-| Waiver position | Your position in the waiver order. |
-| Waiver budget remaining | Only in FAAB leagues; added when a league switches to FAAB, `unknown` when it switches away. Attributes: budget, used. |
-| Draft start | When the draft is scheduled to start (a timestamp, so "in 3 days" on cards and usable in time triggers). Attributes: draft ID, status (`pre_draft`, `drafting`, `paused`, `complete`), type (snake, linear, auction), rounds, teams, pick timer in seconds, your draft slot. |
-| On the clock | The team whose pick it is, with its picture. Attributes: pick number, round, pick in round, pick as `2.06`, roster ID, whether it is yours, the deadline of the pick, whether the draft is paused, picks made and total. |
-| My next pick | How many picks are made before your next one; `0` while you are on the clock. Attributes: pick number, round, pick in round, pick as `2.06`. |
-| Last pick | The player picked last, with the player's picture. Attributes: pick number, round, pick in round, pick as `2.06`, who picked, roster ID, player ID, position, NFL team, whether it was yours, keeper. |
+| League status | `pre_draft`, `drafting`, `in_season` or `complete` |
+| Team, Record, Rank | Your team, `W-L(-T)` record and standings position |
+| Points for / against | Season totals |
+| Matchup points, Opponent points | Live points this week (week and starters as attributes) |
+| Projected points, Opponent projected points | Live points plus what the starters are still expected to score |
+| Win probability | Your chance to win this week's matchup, in % |
+| Opponent | Your opponent's team name |
+| Starters out | Starters that won't play (injury, bye, empty slot) |
+| Last big play | Player of the latest big play in your matchup |
+| Waiver position, Waiver budget remaining | Waiver order and FAAB budget (FAAB leagues only) |
+| Draft start, On the clock, My next pick, Last pick | Draft schedule and progress |
 
-The draft entities exist for every league with a draft. **On the clock** and **My next pick**
-are `unknown` before the draft, after it, in auction drafts (which have no pick order) and
-when you have no pick left. After the draft they keep showing the final state.
+Projections and win probability are calculated by the integration from Sleeper's player
+projections and your league's scoring settings, so they can differ slightly from the app.
 
-Matchup entities are `unknown` on a bye week, before the draft and outside the regular and
-post season.
+## Triggers
 
-To know whether you are ahead, create a template binary sensor helper
-(**Settings → Devices & services → Helpers → Create helper → Template**) that compares
-the two points sensors:
+| Trigger | Fires when |
+|---|---|
+| **Player scored** | A starter in your matchup gains or loses at least 3 points (configurable) |
+| **Matchup finished** | The last game of your matchup is over (filter by win, loss or tie) |
+| **On the clock** | It is your turn in a draft (or anyone's) |
+| **Draft pick made** | A pick is made in a draft |
 
-```jinja
-{{ states('sensor.wombats_league_matchup_points') | float(0)
-   > states('sensor.wombats_league_opponent_points') | float(0) }}
-```
-
-**Team** shows your team's picture instead of its icon, **Opponent**, **Opponent
-points** and **Opponent projected points** your opponent's, **Last big play** the player's headshot (the team logo for a
-defense). A team picture uploaded for the league is preferred over the
-manager's profile picture; without either, the icon stays. Your browser or the companion app
-loads team pictures and logos directly from Sleeper's image server; a team picture anywhere
-else is ignored, so another manager cannot make your dashboards load images from a server of
-their choice. Player headshots are wide, so Home Assistant fetches them and serves
-them cropped to a square (`/api/sleeper/player_picture/…`); otherwise the round badge shows
-the head off to the side. Browsers load entity pictures without logging in, so this address
-answers without authentication, but only for the players an entity shows at the moment.
-Changed pictures show up with the hourly refresh of the league list.
-
-### Projections and win probability
-
-The Sleeper app computes its matchup projection and win probability itself; the API only
-has each player's projected stats for the week (by Rotowire). The integration does the same
-math:
-
-- Each starter's projected stats are scored with your league's scoring settings, so the
-  projection matches your league's format, not just PPR or half PPR.
-- Projections are pre-game values and do not change during a game. A starter still adds
-  their projection times the share of their game that is left (from the game clock): all of
-  it before kickoff, half of it at halftime, nothing once the game is over.
-- The final margin is treated as a normal distribution around the projected margin, with
-  a standard deviation of 29 points before kickoff (backtested on a 12-team half-PPR
-  league) that shrinks as the games are played. Once every game is over the probability
-  is 0 or 100 %.
-
-On a live game day the numbers were within two points and two percentage points of the
-Sleeper app, which uses its own, unpublished model. Projections and the game clock come from the
-GraphQL API the Sleeper app uses; it needs no login but is not documented and may change.
-If it fails, the three entities are `unknown` until the next successful update; everything
-else keeps working.
-
-### Big plays: trigger, events and the activity feed
-
-Whenever a starter on either side of your matchup gains or loses **3 or more points** between
-two updates (a field goal, a touchdown, a long play, a fumble or a stat correction), the
-integration reports a big play. The league device's **Activity** feed and the logbook show
-these as readable lines, for example "Caleb Williams scored 6.3 points (24 total, Wombats
-League)". The **Last big play** sensor keeps the biggest change of the latest update that had
-any, so a dashboard card can show who just scored, with picture. Its value is the points of
-that play; the player's name (`player`), the total (`points`) and the other details are
-attributes. Being a number, it stays out of the activity feed, so each play appears there
-only once.
-
-#### Trigger: Player scored
-
-In the automation editor, add a trigger, pick **Sleeper** and choose **Player scored**. It has
-two options and an optional target:
-
-- **Whose player**: any, my team or opponent.
-- **Minimum change**: the points gained or lost, at least 3. A change of six or more is
-  usually a touchdown.
-- **Target**: leave empty to trigger for all your leagues, or pick a league device (or one of
-  its entities, its area or a label). Picking the account device covers all its leagues.
-
-The action receives the play as `trigger.player`, `trigger.delta`, `trigger.points`,
-`trigger.is_mine`, `trigger.position`, `trigger.team`, `trigger.picture`, `trigger.league`
-and so on. To celebrate your own touchdowns:
+Each is also available as an event (`sleeper_player_scored`, `sleeper_matchup_finished`,
+`sleeper_draft_on_the_clock`, `sleeper_draft_pick`) and shows up in the logbook.
 
 ```yaml
 triggers:
   - trigger: sleeper.player_scored
-    target:
-      device_id: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
     options:
       side: mine
       min_delta: 6
@@ -197,222 +74,35 @@ actions:
       message: "{{ trigger.player }} just scored {{ trigger.delta }} points!"
 ```
 
-#### Event
-
-The trigger is built on the `sleeper_player_scored` event, which you can also use directly,
-for example from Node-RED or an event trigger. Its data contains `player`, `player_id`,
-`position`, `team`, `picture`, `roster_id`, `is_mine`, `previous_points`, `points`, `delta`,
-`week`, `matchup_id`, `league`, `league_id`, `user_id` and `device_id`.
-
-Sleeper updates points about once a minute, so two quick plays by the same player can
-arrive as one change, and a change of six or more points is usually, but not always, a
-touchdown. Bench players and changes below 3 points never fire.
-
-### Matchup finished: trigger and event
-
-Once a week, when the last game with a starter of either side of your matchup is over, the
-integration fires a `sleeper_matchup_finished` event. The league device's **Activity** feed
-and the logbook show it as, for example, "won 112.4 to 98.1 against Team 2 (week 8, Wombats
-League)". The result is the score at that moment: stat corrections can still change it
-until Sleeper settles the week. A matchup that is already over when Home Assistant starts
-does not fire again. The end of the games comes from the same undocumented API as the game
-clock; while that is down, the event comes late rather than never.
-
-Add a trigger, pick **Sleeper** and choose **Matchup finished**. The **Result** option limits
-it to wins, losses or ties; the optional target works like for Player scored. The action
-receives `trigger.result` (`win`, `loss` or `tie`), `trigger.points`, `trigger.opponent`,
-`trigger.opponent_points`, `trigger.team`, `trigger.week`, `trigger.league` and so on; the
-event has the same data plus `league_id`, `matchup_id`, `user_id` and `device_id`.
-
-```yaml
-triggers:
-  - trigger: sleeper.matchup_finished
-    options:
-      result: win
-actions:
-  - action: notify.mobile_app_phone
-    data:
-      message: >-
-        You beat {{ trigger.opponent }} {{ trigger.points }} to
-        {{ trigger.opponent_points }} in {{ trigger.league }}!
-```
-
-### Drafts: triggers, events and the activity feed
-
-Built for **slow drafts** (pick timers of hours or days). Sleeper's servers cache every
-response for 60 seconds, so in a fast draft with a 60 or 90 second clock the integration
-notices your turn when it is half over. Picks still arrive, just late.
-
-While a draft runs, every pick fires a `sleeper_draft_pick` event and appears in the league
-device's **Activity** feed and the logbook as, for example, "Team 2 picked Jahmyr Gibbs
-(1.07, Wombats League)". Several picks made between two updates are all reported. Whenever
-the pick on the clock moves on, a `sleeper_draft_on_the_clock` event fires; it has no logbook
-line of its own because the **On the clock** sensor's change already shows there.
-
-The pick order follows from the draft type (snake, third round reversal, linear), the draft
-order and traded picks. Auction drafts have no order: they get the pick events and the
-**Last pick** sensor, but nobody is ever "on the clock".
-
-#### Trigger: On the clock
-
-Add a trigger, pick **Sleeper** and choose **On the clock**. By default it fires when it is
-**your** turn; the **Whose pick** option can switch it to other teams or every pick. The
-optional target works like for Player scored. The action receives `trigger.pick` (as
-`2.06`), `trigger.pick_no`, `trigger.round`, `trigger.team`, `trigger.picture`,
-`trigger.deadline`, `trigger.picks_until_mine`, `trigger.is_mine`, `trigger.league` and so on.
-
-```yaml
-triggers:
-  - trigger: sleeper.on_the_clock
-actions:
-  - action: notify.mobile_app_phone
-    data:
-      message: "You are on the clock in {{ trigger.league }} (pick {{ trigger.pick }})!"
-```
-
-#### Trigger: Draft pick made
-
-Fires for every pick; **Whose pick** limits it to your own picks or those of the other
-teams. The action receives `trigger.player`, `trigger.position`, `trigger.team` (the NFL
-team), `trigger.picked_by` (the fantasy team), `trigger.pick`, `trigger.picture`,
-`trigger.is_mine`, `trigger.is_keeper` and so on. The same data is in the
-`sleeper_draft_pick` event.
-
-Reminders before the draft need no trigger of their own: use a time trigger on the **Draft
-start** sensor, for example "1 hour before":
-
-```yaml
-triggers:
-  - trigger: time
-    at:
-      entity_id: sensor.wombats_league_draft_start
-      offset: "-01:00:00"
-```
-
-The pick deadline (in the **On the clock** attributes and the trigger data) is the time of the
-last pick plus the pick timer. It is `unknown` while the draft is paused, during Sleeper's
-overnight autopause and in drafts without a timer.
-
-### Season rollover
-
-Sleeper creates a new league for every season. When Sleeper switches to the new league
-season, the new leagues appear automatically (within an hour) and the devices of last
-season's leagues are removed together with their entities. Disabled devices are removed
-too. Long-term statistics of the old entities stay in the recorder.
-
 ## Data updates
 
-The integration polls the Sleeper API and adapts the interval to what is happening:
-
-| Situation | Interval |
-|---|---|
-| A game is running in which a starter of your matchup plays (yours or your opponent's) | 60 seconds |
-| Points in your matchup changed or a draft pick was made within the last 30 minutes | 60 seconds |
-| A draft is running, nobody has picked for 30 minutes | 5 minutes |
-| Regular or post season, no points changing | 15 minutes |
-| Pre-season and off-season | 60 minutes |
-
-The next kickoff of a game with a starter of your matchup pulls the next update forward to
-the kickoff time; Sleeper publishes the exact kickoff times weeks in advance. Games in which
-neither you nor your opponent has a starter, and the other matchups of the league, cause no
-extra updates.
-
-A scheduled draft pulls the next update forward to its start time, and for six hours after
-a scheduled start that the commissioner has not started yet the 5 minute interval applies.
-
-60 seconds is the fastest useful interval: Sleeper's servers cache every response for
-60 seconds. The league list and members are reloaded once an hour. There is no option to
-change the intervals; if you need an update right now, call the `homeassistant.update_entity`
-action on any Sleeper entity.
-
-Each update requests the rosters of every league and the matchups of the leagues in season.
-While you play a matchup, the projections of the starters on both sides (for all leagues at
-once) and the state of the week's NFL games are requested too, but only when they can have
-changed, because these requests are not cached by Sleeper's servers:
-
-- The game clock every update while a game with a starter of your matchup is running, and
-  otherwise once an hour, to follow changes of the kickoff times.
-- A projection no longer changes once the player's game has started. The others are
-  requested again once an hour (Sleeper updates them about that often) and at every kickoff
-  of a game in your matchup, which picks up players ruled out shortly before. A starter new
-  to a line-up is requested right away.
-Draft data is only requested while it can change: a league whose draft has not started
-gets one request per update (to notice the start), a league that is drafting three (the
-draft, its picks and its traded picks), and a league whose draft is finished none at all.
-The finished draft is loaded once after a start of Home Assistant and kept.
-
-Player names, positions and injury statuses come from Sleeper's player list, which is over
-10 MB. It is downloaded once per day at most, shared by all accounts, and kept in Home
-Assistant's storage so a restart does not download it again. If the download fails, the
-integration keeps working and shows player IDs instead of names until the next attempt an
-hour later.
+Polling adapts to what is happening: every 60 seconds while a game with one of your
+matchup's starters is running or a draft is active, 15 minutes during the season and 60
+minutes off-season. Sleeper caches responses for 60 seconds, so draft triggers are meant
+for slow drafts.
 
 ## Known limitations
 
-- Only NFL leagues are supported.
-- Kickoff times and the game clock come from the GraphQL API the Sleeper app uses, which
-  is not documented. If it fails, the first score change of a game day is noticed at the
-  idle interval (up to 15 minutes late); after that, updates run every 60 seconds until
-  scores stop changing.
-- Projections and win probability are the integration's own calculation and can differ a
-  little from the Sleeper app.
-- A starter ruled out during a game keeps their projection for the rest of it; the Sleeper
-  app counts only the points they have scored so far once they are officially out.
-- Fast drafts (pick clocks of a minute or two) cannot be followed in time because of the
-  60 second cache, see the Drafts section.
-- Transactions and playoff brackets are planned for a later release.
+- NFL only.
+- Projections, kickoff times and the game clock come from Sleeper's undocumented GraphQL
+  API and may break without notice.
+- Transactions and playoff brackets are not supported yet.
 
 ## Removal
 
-1. Go to **Settings → Devices & services → Sleeper**.
-2. Open the three-dot menu of the account you want to remove and choose **Delete**.
-3. To remove the integration files as well, delete it from HACS (or delete the
-   `custom_components/sleeper` folder) and restart Home Assistant.
-
-Deleting the last account also deletes the stored copy of Sleeper's player list.
+**Settings → Devices & services → Sleeper**, open the account's three-dot menu and choose
+**Delete**. Then remove the integration in HACS and restart Home Assistant.
 
 ## Troubleshooting
 
-Enable debug logging via **Settings → Devices & services → Sleeper → Enable debug logging**,
-or in `configuration.yaml`:
-
-```yaml
-logger:
-  logs:
-    custom_components.sleeper: debug
-```
-
-Please attach the log output when [opening an issue](https://github.com/daniel-w00/ha-sleeper/issues),
-and the diagnostics if you can: in the three-dot menu of the account, choose **Download
-diagnostics**. They show what the integration knows about your leagues, games and
-projections, without league IDs, user IDs or names.
-
-## Development
-
-```bash
-scripts/setup    # create .venv with Home Assistant and tooling
-scripts/develop  # start a dev Home Assistant on http://localhost:8123
-scripts/test     # run the test suite with coverage
-scripts/lint     # ruff + pyright (use --fix to auto-format)
-```
+Enable debug logging on the integration page and attach the log and the diagnostics
+(three-dot menu → **Download diagnostics**) when
+[opening an issue](https://github.com/daniel-w00/ha-sleeper/issues).
 
 ## Disclaimer
 
-This is a custom (third-party) integration. It is not part of Home Assistant and not a
-Sleeper product. It is developed and maintained independently and is **not affiliated with,
-authorised by, endorsed or sponsored by Sleeper or its operators**, the NFL, or any of their
-partners. "Sleeper" and all other names, logos and marks belong to their respective owners
-and are used here only to describe which service this integration talks to. Home Assistant
-is a trademark of the Open Home Foundation.
-
-The integration uses Sleeper's public, read-only API. It never asks for your password and
-cannot change anything in your Sleeper account. That API is undocumented and unsupported:
-Sleeper can change or withdraw it at any time, which may break this integration without
-warning. Please report problems with the integration [in this
-repository](https://github.com/daniel-w00/ha-sleeper/issues) — never to Sleeper's or Home
-Assistant's support channels.
-
-Provided "as is", without warranty of any kind, see [LICENSE](LICENSE).
+Not affiliated with or endorsed by Sleeper or the NFL. Uses Sleeper's public API, which can
+change at any time. Please report problems here, not to Sleeper or Home Assistant.
 
 ## License
 

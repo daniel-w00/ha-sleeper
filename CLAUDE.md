@@ -84,7 +84,7 @@ core integration.
 | dependency-transparency | `manifest.json` has no requirements; client is in-package |
 | brands | `custom_components/sleeper/brand/` (placeholder icons) |
 | docs-* | `README.md` sections Installation, Configuration, Removal |
-| docs-triggers | `README.md` sections Big plays, Matchup finished and Drafts, `trigger.py`, `triggers.yaml` |
+| docs-triggers | `README.md` section Triggers, `trigger.py`, `triggers.yaml` |
 | action-setup, docs-actions, docs-conditions, entity-event-setup | exempt, see `quality_scale.yaml` |
 
 Full checklist: https://developers.home-assistant.io/docs/core/integration-quality-scale/checklist
