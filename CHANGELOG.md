@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Starters out** counts starters whose team has a bye this week, with the reason `Bye`.
+
 ### Changed
 
 - An empty starting slot has no `player` in the attributes of **Starters out** and

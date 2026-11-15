@@ -86,7 +86,7 @@ the account device; they are removed on update.)
 | Rank | Your position in the standings (win percentage, then points for). |
 | Points for, Points against | Season totals. Updated by Sleeper once a week is final. |
 | Matchup points | Your live points in this week's matchup. Attributes: week, matchup ID, and your starters with slot, name and points. |
-| Starters out | Number of your starters not expected to play: injury status Out, Doubtful, IR, PUP, suspended or similar, inactive players, and empty slots. Attribute: the affected starters with slot and reason. Questionable players are not counted. |
+| Starters out | Number of your starters not expected to play: injury status Out, Doubtful, IR, PUP, suspended or similar, inactive players, players whose team has a bye this week, and empty slots. Attribute: the affected starters with slot and reason (`Bye` for a bye week, `Empty` for an empty slot). Questionable players are not counted. Bye weeks are known while you have a matchup and the week still has games to play. |
 | Opponent points | Your opponent's live points. |
 | Projected points | The points you are projected to end the week with: your live points plus what your starters are still expected to score (see below). Attributes: remaining points, pre-game projection of the whole line-up, starters yet to play, starters playing. |
 | Opponent projected points | The same for your opponent. |

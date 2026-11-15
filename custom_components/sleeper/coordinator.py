@@ -68,6 +68,7 @@ from .const import (
     PROJECTIONS_REFRESH_INTERVAL,
     SCORING_SEASON_TYPES,
     STARTER_OUT_INJURY_STATUSES,
+    STARTER_STATUS_BYE,
 )
 from .players import SleeperPlayers
 
@@ -122,11 +123,16 @@ class SleeperPointsChange:
 
 @dataclass(frozen=True, slots=True)
 class SleeperStarter:
-    """A starting slot of the account's roster."""
+    """A starting slot of the account's roster.
+
+    ``on_bye`` tells that the player's team has no game in a week that still
+    has games to play.
+    """
 
     slot: str
     player_id: str
     player: SleeperPlayer | None
+    on_bye: bool = False
 
     @property
     def name(self) -> str | None:
@@ -153,6 +159,8 @@ class SleeperStarter:
             return self.player.injury_status
         if self.player.status == PLAYER_STATUS_INACTIVE:
             return self.player.status
+        if self.on_bye:
+            return STARTER_STATUS_BYE
         return None
 
 
@@ -233,14 +241,32 @@ class SleeperLeagueData:
     def _starters(self, player_ids: tuple[str, ...]) -> tuple[SleeperStarter, ...]:
         """Resolve a list of starter IDs to slots and players."""
         slots = self.league.roster_positions
+        players = [self.player_lookup(player_id) for player_id in player_ids]
         return tuple(
             SleeperStarter(
                 slot=slots[index] if index < len(slots) else "?",
                 player_id=player_id,
-                player=self.player_lookup(player_id),
+                player=player,
+                on_bye=self._on_bye(player),
             )
-            for index, player_id in enumerate(player_ids)
+            for index, (player_id, player) in enumerate(
+                zip(player_ids, players, strict=True)
+            )
         )
+
+    def _on_bye(self, player: SleeperPlayer | None) -> bool:
+        """Return whether a player's team has no game this week.
+
+        Unknown, and so ``False``, without the week's games or the player's
+        team. Once every game of the week is over, the line-up on the roster
+        is next week's, whose games are not loaded yet; nobody counts as on
+        a bye then.
+        """
+        if self.games is None or player is None or player.team is None:
+            return False
+        if all(game.status == GAME_STATUS_COMPLETE for game in self.games.values()):
+            return False
+        return player.team not in self.games
 
     @property
     def my_starters(self) -> tuple[SleeperStarter, ...]:
@@ -263,7 +289,7 @@ class SleeperLeagueData:
 
     @property
     def starters_out(self) -> tuple[SleeperStarter, ...]:
-        """Return starters not expected to play, including empty slots."""
+        """Return starters not expected to play: out, on a bye, or missing."""
         return tuple(
             starter for starter in self.my_starters if starter.status is not None
         )

@@ -481,6 +481,46 @@ def test_starter_status(player: dict[str, str] | None, status: str | None) -> No
     assert starter.status == status
 
 
+def test_starters_on_a_bye() -> None:
+    """Test a starter whose team has no game this week counts as out."""
+    players = {
+        "play": SleeperPlayer.from_json({"player_id": "play", "team": "BAL"}),
+        "bye": SleeperPlayer.from_json({"player_id": "bye", "team": "SEA"}),
+        "hurt": SleeperPlayer.from_json(
+            {"player_id": "hurt", "team": "SEA", "injury_status": "Out"}
+        ),
+        "free": SleeperPlayer.from_json({"player_id": "free"}),
+    }
+    roster = SleeperRoster.from_json(
+        {
+            "roster_id": 1,
+            "league_id": "1",
+            "owner_id": "a",
+            "starters": ["play", "bye", "hurt", "free", "ghost"],
+        }
+    )
+    data = replace(_league_data((roster,)), player_lookup=players.get)
+
+    # Without the week's games nobody is known to be on a bye.
+    assert [starter.status for starter in data.starters_out] == ["Out"]
+
+    # The injury is the more telling reason; players without a team and
+    # players missing from the list are left alone.
+    game = _game("1", "pre_game", ("BAL", "IND"))
+    data = replace(data, games=dict.fromkeys(game.teams, game))
+    assert [(starter.player_id, starter.status) for starter in data.starters_out] == [
+        ("bye", "Bye"),
+        ("hurt", "Out"),
+    ]
+
+    # With every game over, the line-up is next week's: no bye is known.
+    game = replace(game, status="complete")
+    data = replace(data, games=dict.fromkeys(game.teams, game))
+    assert [starter.status for starter in data.starters_out] == ["Out"]
+    data = replace(data, games={})
+    assert [starter.status for starter in data.starters_out] == ["Out"]
+
+
 def _draft(
     status: str = "drafting",
     draft_type: str = "snake",

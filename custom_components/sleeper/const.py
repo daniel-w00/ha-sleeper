@@ -61,6 +61,8 @@ STARTER_OUT_INJURY_STATUSES: Final = frozenset(
     {"Out", "Doubtful", "IR", "PUP", "Sus", "NA", "DNR"}
 )
 PLAYER_STATUS_INACTIVE: Final = "Inactive"
+# Reason shown for a starter whose team does not play this week.
+STARTER_STATUS_BYE: Final = "Bye"
 # Sleeper fills empty starting slots with this placeholder ID.
 EMPTY_SLOT_PLAYER_ID: Final = "0"
 
